@@ -1,0 +1,5 @@
+-How many contracts for minting NFTs & escrow?
+-Access control will be necessary to make sure buyer funds cannot be withdrawn after purchase (one-way, onlyBuyer() modifiers?)
+-Figure out how OpenSea lists prices vs auctions are carried out
+-Build website
+-Find a way to create addresses on-chain? for ease of use (boomer users don't need to know they are using blockchain) 
