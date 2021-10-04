@@ -1,5 +1,25 @@
--How many contracts for minting NFTs & escrow?
--Access control will be necessary to make sure buyer funds cannot be withdrawn after purchase (one-way, onlyBuyer() modifiers?)
--Figure out how OpenSea lists prices vs auctions are carried out
+-How many contracts for minting NFTs & escrow? SEPARATE ESCROW AND HORN NFTS
+  NFT contract must communicate with SEPARATE escrow contract in order to approve transfers
+-Access control in ESCROW ctrct will be necessary to make sure buyer funds cannot be withdrawn after purchase
 -Build website
 -Find a way to create addresses on-chain? for ease of use (boomer users don't need to know they are using blockchain) 
+
+Write escrow contract!
+
+check syntaxes of implementations
+
+review mappings, probably need a nested mapping?
+ -differentiate horns for sale vs horns owned by owners
+ -Do horns need to be burned when sold? PROBABLY NOT
+   -if so, how do you burn non fungible tokens within a mapping?
+
+review events, probably need to use an ENUM to track paid/shipped/received status
+
+write more tests, think more about UX
+
+import openzeppelin dependencies
+
+Figure out:
+ how to accept ERC20 token deposits (stables ie USDC, USDT, DAI) in ESCROW smart contract 
+ how to use NFT contract to listen for deposits of said stablecoins (to mark as paid & initiate shipping)
+ how to list NFT horn prices vs auctions (look at OPENSEA)
