@@ -20,45 +20,51 @@ contract HornMarketplace is // Ownable, Roles, ERC721, ERC721TokenReceiver, ERC7
     /*
         Target Escrow Contract
     */
-    EscrowContract escrow = EscrowContract(NEED_ESCROW_CONTRACT_ADDR_HERE);
+    //EscrowContract escrow = EscrowContract(DEVELOPMENT_DEPLOYED_ESCROW_ADDR_HERE);
+    //EscrowContract escrow = EscrowContract(RINKEBY_DEPLOYED_ESCROW_ADDR_HERE)
 
     /*
-        On-chain Horn data: Metadata Struct, HornId Index
+        On-chain Horn data: Metadata Struct
     */
     // @param make denotes builder/manufacturer of the instrument 
     // @param model denotes model name of the instrument
     // @param style denotes double/triple/descant/single/compensating and wrap ie geyer/kruspe/knopf/other
     // @param serialNumber denotes serial number
-    // @param seller denotes seller who listed
+    // @param currentOwner denotes musician who currently owns the instrument
     // @param buyer denotes buyer who purchased
     struct Horn {
-      string: make,
-      string: model,
-      string: style,
-      uint: serialNumber,
-      uint: listPrice,
-      address: seller,
-      address: buyer,
+      string make,
+      string model,
+      string style,
+      uint serialNumber,
+      uint listPrice,
+      HornStatus status, 
+      address currentOwner,
+      address buyer,
     }
 
     /*
         Enum for Status of Order
     */
-    enum OrderStatus {
+    enum HornStatus {
+        NotForSale,
         ListedForSale,
-        Purchased,
+        PaidFor,
         Shipped,
         Delivered,
-        Owned
+        Completed
     }
 
+    // @dev HornId is a unique counter for each horn NFT in existence
+    // @dev hornsForSale array allows for quickly viewing listed instruments
     uint HornId;
+    uint[] hornsForSale;
 
-    // @notice horns mapping keeps track of horn owners via hornIndex
+    // @notice horns mapping keeps track of horn owners (not just buyers/sellers) via hornId
     mapping (uint => Horn) horns;
     // @dev sellers and buyers mappings used for roles-based function access
     // @dev add address to sellers when horn is listed, address to buyers when horn is purchased
-    mapping (uint => address) sellers;
+    mapping (uint => address) currentOwners; // need a sellers mapping in addition? or loop through hornsForSale[] array to show sellers. whichever makes searching faster
     mapping (uint => address) buyers;
     
     // @notice tx events used for front-end
@@ -72,40 +78,60 @@ contract HornMarketplace is // Ownable, Roles, ERC721, ERC721TokenReceiver, ERC7
     /* 
         Modifiers for Roles-based function access!
     */
+    // @dev Owner role provided in case of emergency bugs or exploits
+    modifier onlyOwner() {}
     // @dev only buyers should be able to mark as received
     modifier onlyBuyer() {}
     // @dev only sellers should be able to mark as shipped 
     modifier onlySeller() {}
+    // @dev Following modifiers read enum HornStatus of hornIds to filter functions by state
+    // @notice NOT ALL OF THESE MAY END UP BEING REQUIRED FOR SMOOTH EXCHANGE
+    modifier forSale(uint hornId) {
+        require(uint(horns[hornId].status) == 1); // requires ListedForSale
+    }
+    //modifier paidFor(uint hornId) {
+    //   require(uint(horns[hornId].status) == 2); // requires PaidFor
+    //}
+    modifier shipped(uint hornId) {
+        require(uint(horns[hornId].status) == 3); // requires Shipped
+    }
+
 
     constructor() public {
         HornId = 0;
+        // list my own horn for sale in constructor to save mainnet deploy gas?
     }
     /*
         Marketplace Function implementations
     */
     // @notice list horn for sale by minting with metadata to fill Horn struct on-chain
-    function list(
+    function createListing(
         string _make, 
         string _model, 
         string _style, 
         uint _serialNumber, 
         uint _desiredPrice,
-        // address _seller  is this line necessary to fill the struct line by line? should always be msg.sender
-        //address _buyer  same q, this line necessary?
-        ) 
-        {
+        // address _currentOwner *dont think this is needd
+        // address _buyer  *dont think this is needed
+        ) public {
           hornId++;
         
-          horns[hornId] = {
-            _make,
-            _model,
-            _style,
-            _serialNumber,
-            _desiredPrice,
-            msg.sender,
-            _buyer
-        }
-        seller = msg.sender;
+          horns[hornId] = Horn({
+            make: _make,
+            model: _model,
+            style: _style,
+            serialNumber: _serialNumber,
+            listPrice: _desiredPrice,
+            status: HornStatus.ListedForSale,
+            currentOwner: msg.sender,
+            buyer: address(0)
+          )};
+          
+          // @dev update mappings and arrays to reflect new listing
+          currentOwners[hornId] = msg.sender;
+          hornsForSale.push(hornId);
+
+          emit HornListedForSale(hornId);
     }
 
     function purchaseHornById(uint _hornId, string shipTo) public {
