@@ -7,14 +7,17 @@ import "../contracts/HornMarketplace.sol";
 
 contract TestHornMarketplace {
     // target HornMarketplace contract for testing
-    HornMarketplace hornmp = HornMarketplace(DeployedAddresses.HornMarketplace());
+    HornMarketplace market = HornMarketplace(DeployedAddresses.HornMarketplace());
     // probably need to target escrow contract as well
-    
-    // test 
+    EscrowContract escrow = EscrowContract(DeployedAddresses.EscrowContract());
 
-    // test listing an instrument
+    /* 
+        Tests!
+    */
+
+    // @dev Test minting an instrument for the first time
     function testHornListing() external {
-            hornmp.list(
+            market.list(
                 "Lukas", 
                 "Double", 
                 "Custom Geyer", 
@@ -24,12 +27,24 @@ contract TestHornMarketplace {
             );
     }
 
-    // test buying an instrument
-    function testHornPurchase() external {}
+    // @dev Test listing an existing HornNFT
+    function testListingExistingHornNFT() external {}
 
-    // ensure only Sellers can mark horn shipped
-    function testMarkAsShipped() external {}
+    // @dev Test buying an instrument
+    function testHornPurchase() external {} // should result in funds deposited to escrow, shouuld access restrict to onlyBuyers
 
-    // ensure only Buyers can mark horn received
-    function testMarkReceived() external {}
+    // @dev Ensure only Sellers can mark horn shipped
+    function testMarkAsShipped(uint __hornId, string _shipTo) external {} // should expect hornShipped event emission with correct address
+
+    // @dev Ensure only Buyers can mark horn received
+    function testMarkDelivered(uint __hornId) external {} // should expect HornDelivered event emission with correct seller, buyer addresses
+
+    // @dev Test price getter function
+    function testGetListPriceByHornId(uint __hornId) external {} // should return listPrice attribute of horn struct of given HornId
+
+    // @dev Test current owner getter function
+    function testGetCurrentOwnerByHornId(uint __hornId) external {} // should return address of owner of given hornId
+
+    // @dev Test current status getter function
+    function testGetStatusOfHornById(uint __hornId) external {} // should return enum status of given hornId
 }

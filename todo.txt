@@ -1,7 +1,8 @@
 -How many contracts for minting NFTs & escrow? 2 so far
   NFT contract must communicate with SEPARATE escrow contract in order to approve transfers
 -Access control in ESCROW ctrct will be necessary to make sure buyer funds cannot be withdrawn after purchase
--Build website
+
+Website:
   -watch tutorials on scaffold-eth for faster front-end developing using react
   -utilize tenderly for event emission subscription for a faster front-end? free
   -utilize netlify + create-react-app to build front end?
@@ -10,7 +11,7 @@
 -Explain transaction mining & gas considerations on UI
 
 Escrow contract:
- -how to accept ERC20 token deposits (stables ie USDC, USDT, DAI) in ESCROW smart contract 
+ -how to accept ERC20 token deposits (stables ie USDC, USDT, DAI) in ESCROW smart contract & communicate that to NFT market contract
 
 
 Horn NFT Contract:
@@ -31,6 +32,6 @@ Escrow + Marketplace interfacing:
  -how to use NFT contract to listen for deposits of said stablecoins (to mark as paid & initiate shipping)
   -approve/safetransfer double call thing
  
- 
+
  Future functionality given extra time:
  how to create addresses on-chain? for ease of use (orchestra boomer users don't need to know they are using blockchain) 

@@ -1,11 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.0;
 
-import "@openzeppelin-contracts/access/ownable.sol";
-import "@openzeppelin-contracts/contracts/utils/Counters.sol";
-import "@openzeppelin-contracts/contracts/token/ERC721/IERC721Receiver.sol"; // necessary?
-import "@openzeppelin-contracts/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
-import "@openzeppelin-contracts/contracts/token/ERC721/extensions/ERC721Enumerable.sol"; // necessary?
+import "@openzeppelin/contracts/utils/Counters.sol";
+import "@openzeppelin/contracts/access/Ownable.sol";
+import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol"; // necessary?
+import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
+import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol"; // necessary?
 
 // ERC721Full (for horns & compatability w/ the following contracts), ??
 
@@ -35,32 +35,29 @@ contract HornMarketplace is Ownable, ERC721TokenReceiver, ERC721URIStorage, ERC7
     // @param currentOwner denotes musician who currently owns the instrument
     // @param buyer denotes buyer who purchased
     struct Horn {
-      string make,
-      string model,
-      string style,
-      uint serialNumber,
-      uint listPrice,
-      HornStatus status, 
-      address currentOwner,
-      address buyer,
+      string make;
+      string model;
+      string style;
+      uint serialNumber;
+      uint listPrice;
+      HornStatus status;
+      address currentOwner;
     }
 
     /*
         Enum for Status of Order
     */
     enum HornStatus {
-        NotForSale,
         ListedForSale,
         PaidFor,
         Shipped,
-        Delivered,
-        Completed
+        OwnedNotForSale
     }
 
     // @dev hornId is a unique, publicly accessible counter (as opposed to Counter _hornId) for each horn NFT in existence
     // @dev hornsForSale array allows for quickly viewing listed instruments
     // uint public hornId; think this is not necessary
-    // address public owner; how to make myself owner?
+    address public owner;
     uint[] hornsForSale;
 
     // @notice horns mapping keeps track of horn owners (not just buyers/sellers) via _hornId
@@ -69,62 +66,73 @@ contract HornMarketplace is Ownable, ERC721TokenReceiver, ERC721URIStorage, ERC7
     // @dev add address to sellers when horn is listed, address to buyers when horn is purchased
     mapping (uint => address) currentOwners; // need a sellers mapping in addition? or loop through hornsForSale[] array to show sellers. whichever makes searching faster
     mapping (uint => address) buyers;
+    mapping (address => string) shippingAddresses;
     
     // @notice tx events used for front-end
-    event HornListedForSale(uint indexed _hornId);
+    event HornListedForSale(uint indexed hornId, address indexed seller /*, string makeAndModel*/); // make and model may be useful for front end
     // event BidReceived(uint indexed _hornId); //bidding may be a later feature
     event HornPurchased(uint indexed hornId, string indexed shipTo, address indexed buyer);
-    event HornShipped(uint indexed hornId);
-    event HornDelivered(uint indexed hornId);
+    event HornShipped(uint indexed hornId, string indexed shipTo, address indexed to);
+    event HornDelivered(uint indexed hornId, address indexed from, address indexed to);
+    event HornNFTOwnershipTransferred(uint indexed hornId, address indexed from, address indexed to);
 
 
     /* 
         Modifiers for Roles-based function access!
     */
-    // @dev Owner role provided in case of emergency bugs or exploits
+    // @dev Maintain an owner address in case of emergency
     modifier onlyOwner() {
+        require(msg.sender == owner);
         _;
     }
-    // @dev only buyers should be able to mark as received
-    modifier onlyBuyer() {
+    // @dev Only buyers should be able to mark as received
+    modifier onlyBuyerWhoPaid(uint hornId) {
+        require(buyers[hornId] == msg.sender);
         _;
     }
-    // @dev only sellers should be able to mark as shipped 
-    modifier onlySeller() {
+    modifier onlySeller(uint hornId) {
+        require(currentOwners[hornId] == msg.sender); // is this best way to check that msg sender owns the horn theyre trying to list?
+        _;
+    }
+    // @dev Only sellers should be able to mark as shipped 
+    modifier onlyFirstTimer(uint hornId) {
+        require(currentOwners[hornId] == address(0)); // is this how to check for msg sender not having any horns to sell?
         _;
     }
     // @dev Following modifiers read enum HornStatus of _hornIds to filter functions by state
     // @notice NOT ALL OF THESE MAY END UP BEING REQUIRED FOR SMOOTH EXCHANGE
-    modifier forSale(uint hornId) {
-        require(uint(horns[_hornId].status) == 1); // requires ListedForSale
+    modifier forSale(uint __hornId) {
+        require(horns[__hornId], "Horn NFT does not exist"); // ensure horn NFT exists
+        require(uint(horns[__hornId].status) == 0); // requires ListedForSale
         _;
     }
-    //modifier paidFor(uint _hornId) {
-    //   require(uint(horns[_hornId].status) == 2); // requires PaidFor
-    //   _;
-    //}
-    modifier shipped(uint _hornId) {
-        require(uint(horns[_hornId].status) == 3); // requires Shipped
+    modifier hornPaidFor(uint __hornId) {
+        require(horns[__hornId], "Horn NFT does not exist"); // ensure horn NFT exists
+        require(uint(horns[__hornId].status) == 1); // requires PaidFor
+        _;
+    }
+    modifier shipped(uint __hornId) {
+        require(horns[__hornId], "Horn NFT does not exist"); // ensure horn NFT exists
+        require(uint(horns[__hornId].status) == 2); // requires Shipped
         _;
     }
 
 
     constructor() public {
         _hornId = 0; //may not be necessary if initialized to 0 anyway
-        // owner = msg.sender; how to make myself owner?
         // list my own horn for sale in constructor to save mainnet deploy gas?
     }
     /*
         Marketplace Function implementations
     */
-    // @notice list horn for sale by minting with metadata to fill Horn struct on-chain
-    function createListing(
+    // @notice List horn for sale by minting with metadata to fill Horn struct on-chain
+    function mintThenListHorn( // change this function to have an if clause that accommodates first time listing vs listing an existing NFT
         string _make, 
         string _model, 
         string _style, 
         uint _serialNumber, 
         uint _desiredPrice) 
-        public onlySeller() returns (uint) {
+        public onlySeller() returns (uint /*, string*/) {
           // @dev Increment counter _hornId then store publicly accessible hornId using current counter
           _hornId.increment();
           uint hornId = _hornId.current();
@@ -139,45 +147,111 @@ contract HornMarketplace is Ownable, ERC721TokenReceiver, ERC721URIStorage, ERC7
             serialNumber: _serialNumber,
             listPrice: _desiredPrice,
             status: HornStatus.ListedForSale,
-            currentOwner: msg.sender,
-            buyer: address(0)
-          )};
+            currentOwner: msg.sender
+          });
                     
           // @dev update mappings and arrays to reflect new listing
           currentOwners[hornId] = msg.sender;
           hornsForSale.push(hornId);
+          string makeAndModel = _make + _model;
 
           return hornId;
+          // return makeAndModel; // Might help front end to provide make and model event emission
 
-          emit HornListedForSale(_hornId);
+          emit HornListedForSale(hornId, msg.sender /*, makeAndModel*/);
     }
 
-    function purchaseHornById(uint hornId, string _shipTo) public onlyBuyer() {
-        /// MUST provide shipping address !!!
-        /// string shipTo = _shipTo;
-        /// send payment to escrow contract
-        // use approve and .transferFrom methods of IERC20 here to send stablecoins
-        /// add msg.sender to buyers[] mapping: 
-        // buyers[_hornId].push(msg.sender)
-        /// notify seller that horn is paid for and must be shipped
-        // emit HornPurchased(_hornId, shipTo, buyers[_hornId]);
+    // @dev Require that given __hornId is forSale and not already purchased
+    function purchaseHornByHornId(uint __hornId, string _shipTo) 
+      public 
+      payable 
+      forSale(__hornId) {
+        /* storing home addresses on-chain involves significant privacy concerns, however
+        * the recent infrastructure bill classifies any developer who writes code that handles monetary value on a blockchain
+        * as a legally recognized "broker" who must report customer information like Address to the IRS
+        * shipping addresses are stored on-chain for legal compliance reasons ONLY
+        * Can these addresses be opaquely stored on front-end instead? zk rollups would alleviate this issue
+        */
+        // @dev Require that buyer sent correct amt of Eth to pay for horn **later can use if clauses to support stablecoin purchases
+        require(msg.value == horns[__hornId].listPrice, "Payment must exactly match list price");
+        // @dev Add shipping address of buyer aka msg.sender to mapping for later confirmation
+        shippingAddresses[msg.sender] = _shipTo;
+        
+        /// Forward payment to escrow contract for safekeeping
+        // escrow.deposit{ value: msg.value }; // later use approve and .transferFrom methods of IERC20 here to send stablecoins
+        // @dev Add msg.sender to buyers[] mapping for access control checking during markHornShipped function call and shipping address confirmation: 
+        buyers[__hornId].push(msg.sender);
+        // @dev set status to PaidFor so next function to be called must be markHornShipped by seller
+        horns[__hornId].status = HornStatus.PaidFor;
+
+        delete hornsForSale[__hornId];
+        // @notice Emit event to notify seller via frontend that horn is paid for and must be shipped
+        emit HornPurchased(__hornId, _shipTo, msg.sender);
     }
 
-    function markHornShipped(uint _hornId) public onlySeller() {
-        // confirm shipping address shipTo?
-        // change horns[_hornId].status = Shipped;
+    function markHornShipped(uint __hornId, string shipTo) public 
+      onlySeller(__hornId) 
+      hornPaidFor(__hornId) {
+        // @dev Ensure correct purchased horn is being shipped
+        // HOW DO I DO THAT? what if seller is selling multiple horns & they are in same state
+        // @dev set buyer variable to confirm shipping address shipTo against shippingAddresses mapping given by buyer
+        address buyer = buyers[__hornId];
+        require(shipTo == shippingAddresses[buyer]);
+        // @dev set status of __hornId to Shipped so next functino to be called must finalize exchange
+        horns[__hornId].status = HornStatus.Shipped; // need to wrap in uint()? what is enum syntax
 
-        // approve this contract as spender of horn nft
+        // approve this contract as spender of horn nft so that it will be safetransferred in next function call 
 
-        // emit HornShipped(_hornId);
+        emit HornShipped(__hornId, shipTo, buyers[__hornId]);
     }
 
-    function markHornReceived(uint _hornId) public onlyBuyer() {
-        // change horns[_hornId].status = Received;  or Owned??
-        // emit HornDelivered(_hornId);
+    function markHornDeliveredAndOwnershipTransferred(uint __hornId) public 
+      onlyBuyerWhoPaid(__hornId) 
+      shipped(__hornId) {  
+        // eventually maybe trial weeks can be a supported feature
+        /// MUST be called in order to release escrow funds to seller, and transfer ownership
+        buyers[__hornId] = address(0);  // wipe msg.sender from buyers[] mapping for future txs
+        // shippingAddresses[msg.sender] = address(0); // wipe msg.sender's shipping address from storage for future txs 
+        /// release escrowed payment funds to the seller from escrow contract Escrow.releaseFunds() or smthn like that
+        horns[__hornId].status = HornStatus.OwnedNotForSale;
+        horns[__hornId].currentOwner = msg.sender;
+        // @dev Set previousOwner variable using currentOwners mapping, before that value is updated to reflect new owner
+        address memory previousOwner = currentOwners[__hornId];
+        // @dev Update currentOwners mapping to give ownership to buyer
+        currentOwners[__hornId] == msg.sender;
+
+        emit HornDelivered(__hornId, previousOwner, msg.sender);
+        // emit HornNFTOwnershipTransferred(__hornId);
     }
     
-    function getHornIdPrice(uint hornId) external returns (uint) {
-        return horns[_hornId]
+    /*
+        Helper functions that provide (internal?) getter functionality
+    */
+
+    function getListPriceByHornId(uint __hornId) public returns (uint) {
+        return horns[__hornId].listPrice(); // are () needed? also could typecast this line into string or uint if needed
     }
+
+    function getCurrentOwnerByHornId(uint __hornId) public returns (address) {
+        return currentOwners[__hornId];
+    }
+
+    function getStatusOfHornbyHornId(uint __hornId) public returns (uint) {
+        return horns[__hornId].status;  // is this how to return the state of an enum within a struct?? typecast as uint(kdkdk)?
+    }
+
+    // in future, can add filter functions as well to display only doubles or only Lukas, etc
+
+    /*
+        Administrative Functions
+    */
+    /* 
+    // Allows owner of the marketplace to withdraw fees accumulated by trading
+    function withdrawAccumulatedFees() external onlyOwner {
+        owner.call{value: address(this).balance};
+    }
+    function pause() external onlyOwner {
+        _pause() // how does this work with pausable openzeppelin library?
+    }
+    */
 }
