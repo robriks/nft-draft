@@ -99,6 +99,9 @@ contract HornMarketplace is Ownable, ERC721TokenReceiver, ERC721URIStorage, ERC7
         require(currentOwners[hornId] == address(0)); // is this how to check for msg sender not having any horns to sell?
         _;
     }
+    modifier paidEnough(uint hornId) payable {
+        require(msg.value == horns[hornId].listPrice);
+    }
     // @dev Following modifiers read enum HornStatus of _hornIds to filter functions by state
     // @notice NOT ALL OF THESE MAY END UP BEING REQUIRED FOR SMOOTH EXCHANGE
     modifier forSale(uint __hornId) {
@@ -165,7 +168,8 @@ contract HornMarketplace is Ownable, ERC721TokenReceiver, ERC721URIStorage, ERC7
     function purchaseHornByHornId(uint __hornId, string _shipTo) 
       public 
       payable 
-      forSale(__hornId) {
+      forSale(__hornId) 
+      paidEnough(__hornId) {
         /* storing home addresses on-chain involves significant privacy concerns, however
         * the recent infrastructure bill classifies any developer who writes code that handles monetary value on a blockchain
         * as a legally recognized "broker" who must report customer information like Address to the IRS
