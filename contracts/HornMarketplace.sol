@@ -3,7 +3,9 @@ pragma solidity 0.8.0;
 
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol"; // necessary?
+import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol"; // Not actually necessary but included here in case users send to address(this)
+import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol"; // necessary?
 
@@ -34,12 +36,12 @@ contract HornMarketplace is Ownable, ERC721TokenReceiver, ERC721URIStorage, ERC7
     // @param serialNumber denotes serial number
     // @param currentOwner denotes musician who currently owns the instrument
     // @param buyer denotes buyer who purchased
-    struct Horn {
+    struct Horn { // optimize gas on these struct attributes- which order/size?
       string make;
       string model;
       string style;
-      uint serialNumber;
-      uint listPrice;
+      uint32 serialNumber;
+      uint32 listPrice;
       HornStatus status;
       address currentOwner;
     }
@@ -57,7 +59,7 @@ contract HornMarketplace is Ownable, ERC721TokenReceiver, ERC721URIStorage, ERC7
     // @dev hornId is a unique, publicly accessible counter (as opposed to Counter _hornId) for each horn NFT in existence
     // @dev hornsForSale array allows for quickly viewing listed instruments
     // uint public hornId; think this is not necessary
-    address public owner;
+    address private owner;
     uint[] hornsForSale;
 
     // @notice horns mapping keeps track of horn owners (not just buyers/sellers) via _hornId
@@ -99,8 +101,9 @@ contract HornMarketplace is Ownable, ERC721TokenReceiver, ERC721URIStorage, ERC7
         require(currentOwners[hornId] == address(0)); // is this how to check for msg sender not having any horns to sell?
         _;
     }
+    // @dev Checks that function caller sent exact ETH amount to purchase horn for listed price
     modifier paidEnough(uint hornId) payable {
-        require(msg.value == horns[hornId].listPrice);
+        require(msg.value == horns[hornId].listPrice); // later implement logic that calculates stablecoin price equivalents
     }
     // @dev Following modifiers read enum HornStatus of _hornIds to filter functions by state
     // @notice NOT ALL OF THESE MAY END UP BEING REQUIRED FOR SMOOTH EXCHANGE
@@ -133,8 +136,8 @@ contract HornMarketplace is Ownable, ERC721TokenReceiver, ERC721URIStorage, ERC7
         string _make, 
         string _model, 
         string _style, 
-        uint _serialNumber, 
-        uint _desiredPrice) 
+        uint32 _serialNumber, 
+        uint32 _desiredPrice) 
         public onlySeller() returns (uint /*, string*/) {
           // @dev Increment counter _hornId then store publicly accessible hornId using current counter
           _hornId.increment();
@@ -189,6 +192,7 @@ contract HornMarketplace is Ownable, ERC721TokenReceiver, ERC721URIStorage, ERC7
         horns[__hornId].status = HornStatus.PaidFor;
 
         delete hornsForSale[__hornId];
+
         // @notice Emit event to notify seller via frontend that horn is paid for and must be shipped
         emit HornPurchased(__hornId, _shipTo, msg.sender);
     }
@@ -216,13 +220,17 @@ contract HornMarketplace is Ownable, ERC721TokenReceiver, ERC721URIStorage, ERC7
         /// MUST be called in order to release escrow funds to seller, and transfer ownership
         buyers[__hornId] = address(0);  // wipe msg.sender from buyers[] mapping for future txs
         // shippingAddresses[msg.sender] = address(0); // wipe msg.sender's shipping address from storage for future txs 
-        /// release escrowed payment funds to the seller from escrow contract Escrow.releaseFunds() or smthn like that
+        /// release escrowed payment funds to the seller from escrow contract Escrow.releaseFunds()
+        /// by using an internal function that returns true so that the seller may ConditionalEscrow withdraw()
         horns[__hornId].status = HornStatus.OwnedNotForSale;
         horns[__hornId].currentOwner = msg.sender;
         // @dev Set previousOwner variable using currentOwners mapping, before that value is updated to reflect new owner
         address memory previousOwner = currentOwners[__hornId];
         // @dev Update currentOwners mapping to give ownership to buyer
         currentOwners[__hornId] == msg.sender;
+
+        // @dev Transfer horn NFT from currentOwner to msg.sender using safeTransferFrom from ERC721 interface (avoids NFTs locked in contracts)
+        safeTransferFrom(horns[__hornId].currentOwner, msg.sender, __hornId);
 
         emit HornDelivered(__hornId, previousOwner, msg.sender);
         // emit HornNFTOwnershipTransferred(__hornId);
@@ -232,7 +240,15 @@ contract HornMarketplace is Ownable, ERC721TokenReceiver, ERC721URIStorage, ERC7
         Helper functions that provide (internal?) getter functionality
     */
 
-    function getListPriceByHornId(uint __hornId) public returns (uint) {
+    function getCurrentHornsForSale() public view returns (uint[]) {
+        // loop through hornForSale[] uint array and display them to frontend to parse via hornId (could also do array of structs)
+        // for (i = 0, i < hornsForSale[].length, i++) {
+            // hornId = hornsForSale[i].id;
+            // return horns[hornId];
+        //}
+    }
+
+    function getListPriceByHornId(uint __hornId) public returns (uint32) {
         return horns[__hornId].listPrice(); // are () needed? also could typecast this line into string or uint if needed
     }
 
@@ -241,7 +257,7 @@ contract HornMarketplace is Ownable, ERC721TokenReceiver, ERC721URIStorage, ERC7
     }
 
     function getStatusOfHornbyHornId(uint __hornId) public returns (uint) {
-        return horns[__hornId].status;  // is this how to return the state of an enum within a struct?? typecast as uint(kdkdk)?
+        return horns[__hornId].status;  // is this how to return the state of an enum within a struct?? typecast as uint(kdkdk)? returns (uint8???)
     }
 
     // in future, can add filter functions as well to display only doubles or only Lukas, etc

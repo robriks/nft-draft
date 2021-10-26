@@ -1,6 +1,6 @@
--How many contracts for minting NFTs & escrow? 2 so far
-  NFT contract must communicate with SEPARATE escrow contract in order to approve transfers
+-NFT contract must communicate with SEPARATE escrow contract in order to approve transfers
 -Access control in ESCROW ctrct will be necessary to make sure buyer funds cannot be withdrawn after purchase
+--use ConditionalEscrow from openzeppelin for this? have the modifier return true only when matching roles call functions
 
 Website:
   -watch tutorials on scaffold-eth for faster front-end developing using react
@@ -15,7 +15,8 @@ Escrow contract:
 
 
 Horn NFT Contract:
--import openzeppelin dependencies
+-consider splitting horn marketplace into several files:
+--horn factory / horn marketplace / horn shipping
 -review mappings, probably need a nested mapping?
   -differentiate horns for sale vs horns owned by owners
 -how to store images of instruments 
@@ -23,7 +24,7 @@ Horn NFT Contract:
   -tokenURI metadata?
   -hosted on front end website?
 -how to list NFT horn via price vs auction (look at OPENSEA)
--review events, probably need to use an ENUM to track paid/shipped/received status
+-review events
 
 write more tests, think more about UX
 
