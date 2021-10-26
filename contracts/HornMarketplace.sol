@@ -1,6 +1,11 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.0;
 
+/** 
+  * @title Peer to peer Horn Marketplace using NFTs and Escrow Smart Contract
+  * @author Markus Osterlund, 2nd Horn of National Symphony Orchestra and hopeful Ethereum Engineer @Consensys Academy Bootcamp
+ */
+
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/escrow/Escrow.sol";
@@ -72,8 +77,8 @@ contract HornMarketplace is Ownable, ERC721TokenReceiver, ERC721Enumerable {
     // event BidReceived(uint indexed _hornId); //bidding may be a later feature
     event HornPurchased(uint indexed hornId, string indexed shipTo, address indexed buyer);
     event HornShipped(uint indexed hornId, string indexed shipTo, address indexed to);
-    event HornDelivered(uint indexed hornId, address indexed from, address indexed to);
-    event HornNFTOwnershipTransferred(uint indexed hornId, address indexed from, address indexed to);
+    event HornDeliveredAndNFTOwnershipTransferred(uint indexed hornId, address indexed from, address indexed to);
+    event SellerPaid(uint indexed hornId, address indexed payer, address indexed payee);
 
 
     /* 
@@ -208,15 +213,16 @@ contract HornMarketplace is Ownable, ERC721TokenReceiver, ERC721Enumerable {
         emit HornShipped(__hornId, shippedTo, buyers[__hornId]);
     }
 
-    // Trial weeks for the instrument may be added as a later feature
+    // This function MUST be called in order to release escrow funds to seller, and transfer NFT ownership
     function markHornDeliveredAndOwnershipTransferred(uint __hornId) public 
       onlyBuyerWhoPaid(__hornId) 
       shipped(__hornId) {  
-        /// MUST be called in order to release escrow funds to seller, and transfer ownership
-        buyers[__hornId] = address(0);  // wipe msg.sender from buyers[] mapping for future txs
-        // shippingAddresses[msg.sender] = address(0); // wipe msg.sender's shipping address from storage for future txs 
-        /// release escrowed payment funds to the seller from escrow contract Escrow.releaseFunds()
-        /// by using an internal function that returns true so that the seller may ConditionalEscrow withdraw()
+        // @dev Release escrowed payment funds to the seller from escrow contract
+        escrow.withdraw(horns[__hornId].currentOwner);
+        // @dev Wipe msg.sender from buyers[] and shippingaddresses[] for future txs in case buyer changes address
+        buyers[__hornId] = address(0);
+        shippingAddresses[msg.sender] = "";
+        // @dev Set horn status to no longer be for sale and update horn ownership record history
         horns[__hornId].status = HornStatus.OwnedNotForSale;
         horns[__hornId].currentOwner = msg.sender;
         // @dev Set previousOwner variable using currentOwners mapping, before that value is updated to reflect new owner
@@ -227,8 +233,8 @@ contract HornMarketplace is Ownable, ERC721TokenReceiver, ERC721Enumerable {
         // @dev Transfer horn NFT from seller(currentOwner) to msg.sender using safeTransferFrom from ERC721 interface (avoids NFTs locked in contracts)
         safeTransferFrom(horns[__hornId].currentOwner, msg.sender, __hornId);
 
-        emit HornDelivered(__hornId, previousOwner, msg.sender);
-        emit HornNFTOwnershipTransferred(__hornId, previousOwner, msg.sender);
+        emit HornDeliveredAndNFTOwnershipTransferred(__hornId, previousOwner, msg.sender);
+        emit SellerPaid(__hornId, previousOwner, msg.sender);
     }
     
     /*

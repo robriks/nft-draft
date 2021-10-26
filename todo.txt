@@ -35,4 +35,5 @@ Escrow + Marketplace interfacing:
  
 
  Future functionality given extra time:
+ trial weeks embedded in NFT ownership transfer process?
  how to create addresses on-chain? for ease of use (orchestra boomer users don't need to know they are using blockchain) 

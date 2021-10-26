@@ -20,15 +20,7 @@ contract Escrow is ConditionalEscrow {
     // HornMarketplace hornMarketplace = HornMarketplace(DEVELOPMENT_DEPLOYED_MARKETPLACE_HERE);
     // HornMarketplace hornMarketplace = HornMarketplace(RINKEBY_DEPLOYED_MARKETPLACE_HERE);
 
-    // @dev Modifier logic to check buyer paid exactly the listed price ** moved to hornmarketplace.sol, delete when done
-    // modifier hornPaidFor() {
-        /// approve and .transferFrom are the erc20 methods to be examined
-
-        // require(msg.value == hornMarketplace.HORNPRICEGETTERFUNCTIONHERE())
-        _;
-    }
-
-    // safeguards escrowed funds paid by buyer until buyer receives of horn
+    // @notice Safeguards escrowed funds paid by buyer until buyer receives instrument
     function safelyHoldPaymentFunds() public payable paidEnough() {
         /// approve and .transferFrom are the erc20 methods to use for stablecoin payment
         // call marketplace contract ?
