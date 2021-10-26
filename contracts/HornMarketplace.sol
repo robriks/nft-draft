@@ -3,28 +3,25 @@ pragma solidity 0.8.0;
 
 import "@openzeppelin/contracts/utils/Counters.sol";
 import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol"; // Not actually necessary but included here in case users send to address(this)
-import "@openzeppelin/contracts/token/ERC721/IERC721.sol";
+import "@openzeppelin/contracts/utils/escrow/Escrow.sol";
+import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
+import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
+import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol"; // Not actually necessary but included here in case users new to NFTs send to address(this)
 
-import "@openzeppelin/contracts/token/ERC721/extensions/ERC721URIStorage.sol";
-import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol"; // necessary?
-
-// ERC721Full (for horns & compatability w/ the following contracts), ??
-
-
-// use tokenURI to point to images of the listed instrument (host and store on my website?)
+// use tokenURI to point to images of the listed instrument (host and store on my website)
 
 /*
    Interfaces
 */
 
-contract HornMarketplace is Ownable, ERC721TokenReceiver, ERC721URIStorage, ERC721Enumerable {
+contract HornMarketplace is Ownable, ERC721TokenReceiver, ERC721Enumerable {
     using Counters for Counters.Counter;
-    Counters.Counter private _hornId;
+    Counters.Counter private _hornId; // OpenZeppelin library initializes this to 0 by default
     /*
-        Target Escrow Contract
+        Instantiate Escrow Contract
     */
-    //EscrowContract escrow = EscrowContract(DEVELOPMENT_DEPLOYED_ESCROW_ADDR_HERE);
+    Escrow escrow;
+    //EscrowContract escrow = EscrowContract(DEVELOPMENT_DEPLOYED_ESCROW_ADDR_HERE); // these two lines necessary?
     //EscrowContract escrow = EscrowContract(RINKEBY_DEPLOYED_ESCROW_ADDR_HERE)
 
     /*
@@ -59,7 +56,7 @@ contract HornMarketplace is Ownable, ERC721TokenReceiver, ERC721URIStorage, ERC7
     // @dev hornId is a unique, publicly accessible counter (as opposed to Counter _hornId) for each horn NFT in existence
     // @dev hornsForSale array allows for quickly viewing listed instruments
     // uint public hornId; think this is not necessary
-    address private owner;
+    address payable owner;
     uint[] hornsForSale;
 
     // @notice horns mapping keeps track of horn owners (not just buyers/sellers) via _hornId
@@ -102,7 +99,7 @@ contract HornMarketplace is Ownable, ERC721TokenReceiver, ERC721URIStorage, ERC7
         _;
     }
     // @dev Checks that function caller sent exact ETH amount to purchase horn for listed price
-    modifier paidEnough(uint hornId) payable {
+    modifier paidEnough(uint hornId) {
         require(msg.value == horns[hornId].listPrice); // later implement logic that calculates stablecoin price equivalents
     }
     // @dev Following modifiers read enum HornStatus of _hornIds to filter functions by state
@@ -123,9 +120,9 @@ contract HornMarketplace is Ownable, ERC721TokenReceiver, ERC721URIStorage, ERC7
         _;
     }
 
-
-    constructor() public {
-        _hornId = 0; //may not be necessary if initialized to 0 anyway
+    // @dev Initializes the Horn NFT with name and symbol and instantiates the escrow contract 
+    constructor() ERC721("Horn", "HORN") {
+        escrow = new Escrow();
         // list my own horn for sale in constructor to save mainnet deploy gas?
     }
     /*
@@ -197,26 +194,24 @@ contract HornMarketplace is Ownable, ERC721TokenReceiver, ERC721URIStorage, ERC7
         emit HornPurchased(__hornId, _shipTo, msg.sender);
     }
 
-    function markHornShipped(uint __hornId, string shipTo) public 
+    function markHornShipped(uint __hornId, string shippedTo) public 
       onlySeller(__hornId) 
       hornPaidFor(__hornId) {
-        // @dev Ensure correct purchased horn is being shipped
-        // HOW DO I DO THAT? what if seller is selling multiple horns & they are in same state
-        // @dev set buyer variable to confirm shipping address shipTo against shippingAddresses mapping given by buyer
+        // @dev Set buyer variable to confirm shipping address shipTo against shippingAddresses mapping given by buyer
         address buyer = buyers[__hornId];
-        require(shipTo == shippingAddresses[buyer]);
-        // @dev set status of __hornId to Shipped so next functino to be called must finalize exchange
-        horns[__hornId].status = HornStatus.Shipped; // need to wrap in uint()? what is enum syntax
+        require(shippedTo == shippingAddresses[buyer]);
+        // @dev Set status of __hornId to Shipped so next function to be called will finalize exchange
+        horns[__hornId].status = HornStatus.Shipped;
+        // @dev Approves this contract as spender of horn nft so that it will be safetransferred in next function call 
+        approve(address(this), __hornId);
 
-        // approve this contract as spender of horn nft so that it will be safetransferred in next function call 
-
-        emit HornShipped(__hornId, shipTo, buyers[__hornId]);
+        emit HornShipped(__hornId, shippedTo, buyers[__hornId]);
     }
 
+    // Trial weeks for the instrument may be added as a later feature
     function markHornDeliveredAndOwnershipTransferred(uint __hornId) public 
       onlyBuyerWhoPaid(__hornId) 
       shipped(__hornId) {  
-        // eventually maybe trial weeks can be a supported feature
         /// MUST be called in order to release escrow funds to seller, and transfer ownership
         buyers[__hornId] = address(0);  // wipe msg.sender from buyers[] mapping for future txs
         // shippingAddresses[msg.sender] = address(0); // wipe msg.sender's shipping address from storage for future txs 
@@ -229,11 +224,11 @@ contract HornMarketplace is Ownable, ERC721TokenReceiver, ERC721URIStorage, ERC7
         // @dev Update currentOwners mapping to give ownership to buyer
         currentOwners[__hornId] == msg.sender;
 
-        // @dev Transfer horn NFT from currentOwner to msg.sender using safeTransferFrom from ERC721 interface (avoids NFTs locked in contracts)
+        // @dev Transfer horn NFT from seller(currentOwner) to msg.sender using safeTransferFrom from ERC721 interface (avoids NFTs locked in contracts)
         safeTransferFrom(horns[__hornId].currentOwner, msg.sender, __hornId);
 
         emit HornDelivered(__hornId, previousOwner, msg.sender);
-        // emit HornNFTOwnershipTransferred(__hornId);
+        emit HornNFTOwnershipTransferred(__hornId, previousOwner, msg.sender);
     }
     
     /*
@@ -261,6 +256,10 @@ contract HornMarketplace is Ownable, ERC721TokenReceiver, ERC721URIStorage, ERC7
     }
 
     // in future, can add filter functions as well to display only doubles or only Lukas, etc
+    /* in future, can add support for ERC20 stablecoin payments via a price getter helper function that uses chainlink to calculate current Eth amount to match listed price in dollars:
+        something like require(msg.value == hornMarketplace.HORNPRICEGETTERFUNCTIONHERE()) but needs to aid user in submitting tx with correct ETH amount
+    */
+
 
     /*
         Administrative Functions
