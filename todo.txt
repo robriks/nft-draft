@@ -11,6 +11,10 @@ Website:
 -Explain transaction mining & gas considerations on UI
 
 Escrow contract:
+ -refunds must be supported to combat fraud (ie buyer pays but never receives item)
+   -refunds cannot be free to call by default or else buyers can pay then refund themselves once item is shipped
+     -maybe only allow refund function to be called until item is shipped, after which point funds are locked & a contract owner must step in to recover funds in case of incident (what if mail loses package)
+     -how does contract owner know truth of situation? perhaps receipts of shipping & case filing must be provided to frontend
  -how to accept ERC20 token deposits (stables ie USDC, USDT, DAI) in ESCROW smart contract & communicate that to NFT market contract
 
 

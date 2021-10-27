@@ -47,4 +47,6 @@ contract TestHornMarketplace {
 
     // @dev Test current status getter function
     function testGetStatusOfHornById(uint __hornId) external {} // should return enum status of given hornId
+
+    function testGetEscrowDepositValue(address payee) external {} // should return the current balance of deposits for given address in escrow contract 
 }
