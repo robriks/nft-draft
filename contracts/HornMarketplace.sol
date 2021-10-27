@@ -60,15 +60,16 @@ contract HornMarketplace is Ownable, /*IERC721Receiver, */ERC721Enumerable {
 
     // @dev hornId is a unique, publicly accessible counter (as opposed to Counter _hornId) for each horn NFT in existence
     // @dev hornsForSale array allows for quickly viewing listed instruments via frontend
-    // uint public hornId; think this is not necessary
     // address payable owner;
     uint[] hornsForSale;
 
-    // @notice horns mapping keeps track of horn owners (not just buyers/sellers) via _hornId
+    // @notice horns mapping keeps track of all horn NFT owners & histories via _hornId (s/o to OpenZep Counter.counter library)
     mapping (uint => Horn) horns;
-    // @dev sellers and buyers mappings used for roles-based function access
-    // @dev add address to sellers when horn is listed, address to buyers when horn is purchased
-    mapping (uint => address) currentOwners; // need a sellers mapping in addition? or loop through hornsForSale[] array to show sellers. whichever makes searching faster
+    // @dev Add hash of horn NFT make and serialNumber using Counter.counter to compare all hashes to new mints in an effort to avoid duplicate NFTs of single instruments
+    // mapping (uint => bytes memory) makeAndSerialHashes; // bytes32? 
+    // @dev currentOwners and buyers mappings used for function access control
+    // @dev Add address to buyers when horn is paid for via escrow, address to currentOwners when sale and exchange is complete
+    mapping (uint => address) currentOwners;
     mapping (uint => address) buyers;
     mapping (address => string) shippingAddresses;
     
@@ -91,6 +92,19 @@ contract HornMarketplace is Ownable, /*IERC721Receiver, */ERC721Enumerable {
     //     require(msg.sender == owner);
     //     _;
     // }
+    // @dev Restrict to only users who are minting their instrument as an NFT for the first time by checking hashes of concatenated make and serial number
+    // modifier nonDuplicateListing(uint hornId??, string make, uint serialNumber) {
+        // require(!_exists(hornId), "This horn NFT has already been minted");
+        // checkIfAlreadyMinted(_make, _serialNumber);
+
+    // @dev Helper function to ensure that duplicate NFTs of the same horn are not minted by comparing hashes in a mapping
+    // function checkIfAlreadyMinted(string make, uint32 serialNumber) internal pure returns (bool) {
+    //   bytes memory hashOfMakeAndSerial = keccak256(abi.encodePacked(_make + _serialNumber)); // bytes32?
+    //   for (i = 0, i < horns[].length, i++) {
+    //     require(makeAndSerialHashes[i] != hashOfMakeAndSerial);
+    //   } 
+    // }
+
     // @dev Restrict to only buyer who paid and was added to buyers[] mapping
     modifier onlyBuyerWhoPaid(uint hornId) {
         require(buyers[hornId] == msg.sender, "This function may only be called by a buyer who has already paid");
@@ -139,7 +153,7 @@ contract HornMarketplace is Ownable, /*IERC721Receiver, */ERC721Enumerable {
         string calldata _style, 
         uint32 _serialNumber, 
         uint32 _desiredPrice) 
-        external 
+        external /* nonDuplicateListing(_hornId.current(), _make, _serialNumber) */ // double check how the Counter.counter works with _hornId in a modifier _; setting
         returns (uint /*, string*/) {
           // @dev Increment counter _hornId then store publicly accessible hornId using current counter
           _hornId.increment();
@@ -163,24 +177,16 @@ contract HornMarketplace is Ownable, /*IERC721Receiver, */ERC721Enumerable {
           hornsForSale.push(hornId);
 
           // string makeAndModel = _make + _model; // for emitting new listing events on front end?
-
-
-          // @dev Restrict to only users who are minting their instrument as an NFT for the first time by checking hashes of concatenated make and serial number
-          // require(!checkIfExists(hornId), "This horn NFT has already been minted"); // pseudo override _exists helper function to check if hashed make+serialNo exists in a mapping
-          // function _exists(string _make, uint32 _serialNumber) internal pure returns (bool) {
-          // bytes32 makeAndSerial = keccak256(bytes32(_make + string(_serialNumber))); // ensure that duplicate NFTs of the same horn are not minted by comparing hashes in a mapping? how to require this?
-          // for (i = 0, i < horns[].length, i++) {
-          // require(makeAndSerialHashes[i] != makeAndSerial);
-          //  } 
-          // }
-
-          return hornId;
           // return makeAndModel; // Might help front end to provide make and model event emission
 
           emit HornListedForSale(hornId, msg.sender /*, makeAndModel*/);
-    }
 
-    /* function listExistingHornNFT(uint __hornId) public onlySeller(__hornId) {
+          return hornId;
+
+    }
+    
+    // following function must check that the hornNFT already exists!  and onlySeller(id) checks that it is owned by the caller of the function
+    /* function listExistingHornNFT(uint __hornId, uint32 _desiredPrice) public onlySeller(__hornId) {
         add to hornsforsale uint[] array // consider adding a boolean struct attribute: forsale which may be easier than using uint[] array?
         set hornstatus to forsale
     }

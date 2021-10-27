@@ -1,5 +1,3 @@
--NFT contract must communicate with SEPARATE escrow contract in order to approve transfers
--Access control in ESCROW ctrct will be necessary to make sure buyer funds cannot be withdrawn after purchase
 --use ConditionalEscrow from openzeppelin for this? have the modifier return true only when matching roles call functions
 
 Website:
@@ -12,6 +10,7 @@ Website:
 
 Escrow contract:
  -refunds must be supported to combat fraud (ie buyer pays but never receives item)
+   -Access control in ESCROW ctrct will be necessary to make sure buyer funds cannot be withdrawn after purchase
    -refunds cannot be free to call by default or else buyers can pay then refund themselves once item is shipped
      -maybe only allow refund function to be called until item is shipped, after which point funds are locked & a contract owner must step in to recover funds in case of incident (what if mail loses package)
      -how does contract owner know truth of situation? perhaps receipts of shipping & case filing must be provided to frontend
@@ -21,23 +20,22 @@ Escrow contract:
 Horn NFT Contract:
 -consider splitting horn marketplace into several files:
 --horn factory / horn marketplace / horn shipping
--review mappings, probably need a nested mapping?
-  -differentiate horns for sale vs horns owned by owners
+-is an approvals mapping necessary? is the 721 functionality being preserved properly even with my different variable/mapping names?
 -how to store images of instruments 
-  -on chain via .png?
-  -tokenURI metadata?
-  -hosted on front end website?
--how to list NFT horn via price vs auction (look at OPENSEA)
+  -tokenURI metadata
+  -hosted on front end website
 -review events
 
 write more tests, think more about UX
 
 
 Escrow + Marketplace interfacing:
- -how to use NFT contract to listen for deposits of said stablecoins (to mark as paid & initiate shipping)
-  -approve/safetransfer double call thing
+ -how to list NFT horn via price vs auction (look at OPENSEA)
+
  
 
  Future functionality given extra time:
- trial weeks embedded in NFT ownership transfer process?
- how to create addresses on-chain? for ease of use (orchestra boomer users don't need to know they are using blockchain) 
+  -how to use NFT contract to listen for deposits of said stablecoins (to mark as paid & initiate shipping)
+  -approve/safetransfer double call thing
+  -trial weeks embedded in NFT ownership transfer process?
+  -how to create addresses on-chain? for ease of use (orchestra boomer users don't need to know they are using blockchain) 
