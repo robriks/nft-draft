@@ -18,8 +18,9 @@ Escrow contract:
 
 
 Horn NFT Contract:
--consider splitting horn marketplace into several files:
+-consider splitting horn marketplace into several components:
 --horn factory / horn marketplace / horn shipping
+-consider HASHING sensitive shipping addresses on the front end in order to only store the address hash on chain for privacy reasons
 -is an approvals mapping necessary? is the 721 functionality being preserved properly even with my different variable/mapping names?
 -how to store images of instruments 
   -tokenURI metadata

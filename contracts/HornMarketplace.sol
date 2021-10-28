@@ -155,6 +155,8 @@ contract HornMarketplace is Ownable, /*IERC721Receiver, */ERC721Enumerable {
         uint32 _desiredPrice) 
         external /* nonDuplicateListing(_hornId.current(), _make, _serialNumber) */ // double check how the Counter.counter works with _hornId in a modifier _; setting
         returns (uint /*, string*/) {
+          // @dev listPrice attribute cannot be set to 0
+          require(_desiredPrice > 0, "Your Horn is valuable and cannot be sold for free!");
           // @dev Increment counter _hornId then store publicly accessible hornId using current counter
           _hornId.increment();
           uint hornId = _hornId.current();
@@ -193,7 +195,7 @@ contract HornMarketplace is Ownable, /*IERC721Receiver, */ERC721Enumerable {
     */
 
     // @dev Require that given __hornId is forSale and not already purchased
-    function purchaseHornByHornId(uint __hornId, string calldata _shipTo) 
+    function purchaseHornByHornId(uint __hornId, string calldata _shipTo) // maybe use bytes for address, remove spaces and concatenate in frontend input? so it can be hashed and stored privately
       public 
       payable 
       forSale(__hornId) 

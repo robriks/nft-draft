@@ -61,7 +61,7 @@ contract TestHornMarketplace {
     function testListingExistingHornNFT() public {}
 
     // @dev Test buying an instrument
-    function testHornPurchase() public {} // should result in funds deposited to escrow, shouuld access restrict to onlyBuyers
+    function testHornPurchase() public payable {} // should result in funds deposited to escrow, shouuld access restrict to onlyBuyers
 
     // @dev Ensure only Sellers can mark horn shipped
     function testMarkAsShipped(uint __hornId, string _shipTo) public {} // should expect hornShipped event emission with correct address
@@ -78,17 +78,43 @@ contract TestHornMarketplace {
         testGetCurrentOwnerMappingAgainstStructAttributeByHornId(__hornId);
     } // should expect HornDelivered event emission with correct seller, buyer addresses
 
-    // @notice Modifier tests ensure that access control and other modifier functions work properly
-    // These test functions may be incorporated into the Helper Function section below ?
+    // @notice Modifier tests to ensure that access control and other modifier functions work properly
+    // maybe put these test functions in the Helper Function section below ?
     /* 
-    * function testOnlyBuyerWhoPaid(uint __hornId) {
-        try calling a function with onlybuyerwhopaid modifier from a non-buyer address who didn't pay
-
-        // CHECK IF STRUCTS HAVE DEFAULT GETTERS - if so, reading Counters.Counter _hornId should be useful (made public for testing)
-        hornId = market._hornId.current();
-        bool thieveryAttempt = market.markHornDeliveredAndOwnershipTransferred(hornId);
+    * // attempts to call transfer ownership function from non-buyer address who didn't pay
+    * function testOnlyBuyerWhoPaid() public {
+        // does Counters.Counter _hornId struct have getter? (made public for testing)
+        uint hornId = market._hornId.current(); // identify most recent Horn NFT
+        
+        bool thieveryAttempt = market.markHornDeliveredAndOwnershipTransferred(hornId); // {from: msg.sender} may need this line because this contract isn't an IERC721TokenReceiver to pass the market's safeTransferFrom() method
 
         assert.isFalse(thieveryAttempt, "An account that hasn't paid or been marked as buyer pilfered the NFT!");
+    }
+    * // attempts to call listExistingHornNFT() From non-seller address who isn't currentOwner of the horn
+    * function testOnlySeller() public {
+        uint hornId = market._hornId.current(); // identify most recent horn NFT
+        // impersonator tries to sell someone else's NFT for 1 ether
+        bool sellerImpersonation = market.listExistingHornNFT(hornId, 1000000000000000000); // {from: accounts[1]} may need this line so address calling function isn't the same one who minted
+        
+        assert.isFalse(sellerImpersonation, "A rogue account was able to sell a horn NFT that it didn't own");
+    }
+    * // attempts to call purchaseHornById without having paid enough ETH
+    * function testPaidEnough() public {
+    /*  uint hornId = market._hornId.current(); // identify most recent horn NFT
+        bool sentTooMuch = market.purchaseHornByHornId(
+            hornId, 
+            "420 69th St. Phallus, Virgin Islands 42069")
+            .call({ value: 1000000000000000005 }); // {from: address(this)} needed??
+    }
+    * function testForSale() public {
+        IMPLEMENTHERE
+        try buying a horn that is not for sale
+    }
+    * function testHornPaidFor() public {
+        IMPLEMENTHERE
+    }
+    * function testShipped() public {
+        IMPLEMENTHERE
     }
     */
 
