@@ -21,7 +21,7 @@ import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
 
 contract HornMarketplace is Ownable, /*IERC721Receiver, */ERC721Enumerable {
     using Counters for Counters.Counter;
-    Counters.Counter private _hornId; // OpenZeppelin library initializes this to 0 by default
+    Counters.Counter /*private*/ public _hornId; // OpenZeppelin library initializes this to 0 by default
     /*
         Instantiate Escrow Contract
     */
@@ -258,11 +258,12 @@ contract HornMarketplace is Ownable, /*IERC721Receiver, */ERC721Enumerable {
 
         // @dev Transfer horn NFT from seller(currentOwner) to msg.sender using safeTransferFrom from ERC721 interface (avoids NFTs locked in contracts)
         safeTransferFrom(horns[__hornId].currentOwner, msg.sender, __hornId);
-        return paymentAmt;
 
         emit HornDeliveredAndNFTOwnershipTransferred(__hornId, previousOwner, msg.sender);
         emit SellerPaid(__hornId, previousOwner, msg.sender);
         emit WithdrawnFromEscrow(previousOwner, paymentAmt);
+
+        return paymentAmt;
     }
     
     /*
@@ -277,19 +278,23 @@ contract HornMarketplace is Ownable, /*IERC721Receiver, */ERC721Enumerable {
         //}
     }
 
-    function getListPriceByHornId(uint __hornId) public returns (uint32) {
+    function getListPriceByHornId(uint __hornId) public view returns (uint32) {
         return horns[__hornId].listPrice;
     }
 
-    function getCurrentOwnerByHornId(uint __hornId) public returns (address) {
+    function getCurrentOwnerByMapping(uint __hornId) public view returns (address payable) {
         return currentOwners[__hornId];
     }
 
-    function getStatusOfHornbyHornId(uint __hornId) public returns (HornStatus) {
+    function getCurrentOwnerByStructAttribute(uint __hornId) public view returns (address payable) {
+        return horns[__hornId].currentOwner;
+    }
+
+    function getStatusOfHornByHornId(uint __hornId) public view returns (HornStatus) {
         return horns[__hornId].status;
     }
 
-    function getEscrowDepositValue(address payee) public returns (uint) {
+    function getEscrowDepositValue(address payee) public view returns (uint) {
         escrow.depositsOf(payee);
     }
 

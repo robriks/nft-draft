@@ -13,7 +13,7 @@ interface HornMarketplace {}
   interface IERC20 {} // maybe convert eth to stables at time of tx? 
 */
 
-contract escrow is Escrow {
+contract EscrowContract is Escrow {
     
     // @dev Target the HornMarketplace contract
     // HornMarketplace hornMarketplace = HornMarketplace(DEVELOPMENT_DEPLOYED_MARKETPLACE_HERE);
