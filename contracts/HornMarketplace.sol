@@ -189,6 +189,7 @@ contract HornMarketplace is Ownable, /*IERC721Receiver, */ERC721Enumerable {
     
     // following function must check that the hornNFT already exists!  and onlySeller(id) checks that it is owned by the caller of the function
     /* function listExistingHornNFT(uint __hornId, uint32 _desiredPrice) public onlySeller(__hornId) {
+        require(_desirePrice > 0, "Your Horn is valuable and cannot be sold for free!");
         add to hornsforsale uint[] array // consider adding a boolean struct attribute: forsale which may be easier than using uint[] array?
         set hornstatus to forsale
     }
