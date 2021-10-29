@@ -147,6 +147,7 @@ contract HornMarketplace is Ownable, /*IERC721Receiver, */ERC721Enumerable {
     // @notice List horn for sale by minting with metadata to fill Horn struct on-chain
     // CHANGE THIS function to have an if clause that accommodates first time listing vs listing an existing NFT or create new function for existing horn nFTs? 
     // IF NEW FUNCTION, MAKE SURE ALL MAPPINGS/ATTRIBUTES ARE PROPERLY SET so escrow functions still work on correct addresses (ie line 191)
+    // ALSO CHANGE THIS FUNCTION to have an if clause that allows a minter to mint NFT without listing it for sale (for ownership historical record)
     function mintThenListNewHornNFT( 
         string calldata _make, 
         string calldata _model, 
@@ -299,6 +300,21 @@ contract HornMarketplace is Ownable, /*IERC721Receiver, */ERC721Enumerable {
 
     function getEscrowDepositValue(address payee) public view returns (uint) {
         escrow.depositsOf(payee);
+    }
+
+    // @dev Helper function that sets status of existing horn NFT to OwnedNotForSale, 
+    // @notice Used in case minter only wants verifiable historical record or owner decides not to sell the instrument after listing or wishes to refund a buyer
+    // @notice Must be set to internal after testing is done, only temporarily set to public for testing purposes
+    function initiateRefundOrSetStatusToOwnedNotForSale(uint __hornId) public /*internal*/ returns (HornStatus) {
+        if (horns[__hornId].status == HornStatus.ListedForSale) {
+            horns[__hornId].status = HornStatus.OwnedNotForSale;
+        } else if (horns[__hornId].status == HornStatus.PaidFor) {
+            //REFUND LOGIC HERE: escrow.refundToBuyer();
+        } else if (horns[__hornId].status == HornStatus.Shipped) {
+            revert("Horn has already been shipped and no longer qualifies for a refund, please complete the exchange and redo the exchange in reverse if you wish to switch back ownership");
+        } else if (horns[__hornId].status == HornStatus.OwnedNotForSale) {
+            revert("Horn is already marked as owned and not for sale");
+        }
     }
 
     // in future, can add filter functions as well to display only doubles or only Lukas, etc
