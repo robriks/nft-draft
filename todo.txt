@@ -1,6 +1,20 @@
 --use ConditionalEscrow from openzeppelin for this? have the modifier return true only when matching roles call functions
 
-Website:
+Web-App:
+  -homepage marketplace.com: 
+    /mint Mint your instrument as an NFT! 
+      -ideal UI on marketplace.com/mint page is single question: 
+        -Are you minting your horn as an NFT to list it for sale? If you are minting a Horn NFT to establish a verifiable and immutable record of ownership, select No.
+          Yes/No: mintThenListNewHornNFT() / mintButDontListNewHornNFT()
+    /about HornMarketplace is a place for you to interface with the Ethereum blockchain ...
+    /marketplace Check out the great horns listed for sale!
+      -allow for reports of glitches, bugs, fraudulent listings
+    /horns See what horns people own! Here you'll find all the Horn NFTs in existence, mapped to their owners/players. What horn does your favorite horn player play?
+    /FAQ What are NFTs? What is Ethereum? Who cares? Why Ethereum and not Solana or _insert_random_crypto_here?
+  -note that formatting of NFT data input must be EXPLICITLY outlined or all NFTs will not be uniform and events emitted will suck
+    ie _make: Type only the manufacturer/builder's name here (eg "Lewis", "Rauch") // _model: Type only the model (eg ) OR "single"/"double"/"triple" here // and so forth for each parameter. explicitness fights user error
+  -marketplace can loop over the market contracts hornsForSale[] uint[]array in order to show the horns currently for sale
+
   -watch tutorials on scaffold-eth for faster front-end developing using react
   -utilize tenderly for event emission subscription for a faster front-end? free
   -utilize netlify + create-react-app to build front end?
@@ -27,13 +41,15 @@ Horn NFT Contract:
   -hosted on front end website
 -review events
 
-write more tests, think more about UX
+Test Contract:
+-certain tests cannot be carried out in Solidity via a testing smart contract: notably EVENTS, LOGS must be done in javascript
+-if nested test helper functions with assert() do not work properly inside larger test host functions, simply rework the helpers to return a bool or other value that can be compared in a final larger assert() in the host function
+-check how Enum values are passed into test values as a parameter. Consider wrapping in uint(HornStatus.forSale) or using forSale instead of HornStatus.forSale. or maybe just plain uints 0, 1, 2?
 
 
 Escrow + Marketplace interfacing:
  -how to list NFT horn via price vs auction (look at OPENSEA)
 
- 
 
  Future functionality given extra time:
   -how to use NFT contract to listen for deposits of said stablecoins (to mark as paid & initiate shipping)
