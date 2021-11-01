@@ -6,8 +6,8 @@ import "truffle/DeployedAddresses.sol";
 import "../contracts/HornMarketplace.sol";
 
 contract TestHornMarketplace {
-    // target HornMarketplace contract for testing
-    HornMarketplace market = HornMarketplace(DeployedAddresses.HornMarketplace());
+    // Declare target HornMarketplace contract for testing
+    HornMarketplace market /*= HornMarketplace(DeployedAddresses.HornMarketplace())*/;
     // probably need to target escrow contract as well **apparently not
     // EscrowContract escrow = EscrowContract(DeployedAddresses.EscrowContract());
     
@@ -26,12 +26,16 @@ contract TestHornMarketplace {
     */
     // @dev Sanity checks for horn owner of escrow and marketplace contracts
     function testOwnerOfHornMarketplaceContract() public {
+        freshMarketplaceInstance();
+
         address /*payable*/ returnedOwnerOfHornMarketplaceContract = market.owner();
         address /*payable*/ deployerOfHornMarketplaceContract = msg.sender; // Is this always true? in development I will be the one to call this function and deploy?
         
         assert.equal(returnedOwnerOfHornMarketplaceContract, deployerOfHornMarketplaceContract, "Owner address given by Ownable library function does not match deployer of the Marketplace contract");
     }
     function testOwnerOfEscrow() public {
+        freshMarketplaceInstance();
+
         address /*payable*/ returnedOwnerOfEscrow = market.escrow.owner(); // this is ownable inherited function, may not work
         address /*payable*/ correctOwnerOfEscrow = DeployedAddresses.HornMarketplace();
 
@@ -40,7 +44,9 @@ contract TestHornMarketplace {
     // @dev Test minting an instrument for the first time
     // @param Be sure to give the correct __hornId index of Horn struct in horns[] mapping or test will fail; finicky but other variables are private and don't to add attribute storage costs for a simple test
     function testMintThenListNewHornNFT(uint __hornId) public {
-        uint returnedHornId = mintFreshTestHorn(); // calls market.mintThenListNewHornNFT with preset parameters & incrementing serialNumber, returns hornId
+        freshMarketplaceInstance();
+
+        uint returnedHornId = mintAndListFreshTestHorn(); // calls market.mintThenListNewHornNFT with preset parameters & incrementing serialNumber, returns hornId
         uint expectedHornId = market._hornId.current();
 
         /* also need to check: 
@@ -55,34 +61,63 @@ contract TestHornMarketplace {
         // @dev Checks currentOwner in mapping vs struct attribute
         /*assert.equal(*/testGetCurrentOwnerMappingAgainstStructAttributeByHornId(returnedHornId)/*,  */;
 
-        assert.equal(returnedHornId, expectedHornId, "HornId returned by mintFreshTestHorn does not match the expectedHornId given by the Marketplace's Counter.Counter");
+        assert.equal(returnedHornId, expectedHornId, "HornId returned by mintAndListFreshTestHorn does not match the expectedHornId given by the Marketplace's Counter.Counter");
     }
 
-    // @dev Test listing an existing HornNFT
-    function testListingExistingHornNFT() public {}
+    // @dev Test minting an instrument for the first time but NOT listing it for sale
+    function testMintButDontListNewHornNFT() public {
+        freshMarketplaceInstance();
+        
+        // market.    dkdkdkdk
+        // assert.    dkdkdkkd
+    } // must check that enum status is set to OwnedNotForSale
+    // @dev Test listing an existing Horn NFT
+    function testListingExistingHornNFT() public {
+        freshMarketplaceInstance();
+        mintAndListFreshTestHorn();
+
+        uint hornId = market._hornId.current();
+        market.listExistingHornNFT(hornId, 4200000000000000000);
+
+        // assert.    dkkddkdk
+    }
 
     // @dev Test buying an instrument
-    function testHornPurchase() public payable {} // should result in funds deposited to escrow, shouuld access restrict to onlyBuyers
+    function testHornPurchase() public payable {
+        freshMarketplaceInstance();
+        mintAndListFreshTestHorn();
+
+        uint hornId = market._hornId.current();
+        market.purchaseHornByHornId(hornId, "Ju St. Testing, Purchase Attempt New York, 11111");
+
+        // assert.    dkdk
+    } // should result in funds deposited to escrow
 
     // @dev Ensure only Sellers can mark horn shipped
-    function testMarkAsShipped(uint __hornId, string _shipTo) public {
-        // NOTE testing for emission of events is specifically NOT supported by solidity smart contracts so those tests must be done in javascript!!!
+    // @notice Testing for event emission is specifically NOT supported by solidity smart contracts so those tests must be done in javascript!!!
+
+    function testMarkAsShipped() public {
+        freshMarketplaceInstance();
+        mintAndListFreshTestHorn();
+
+        uint hornId = market._hornId.current();
+        prepareForShipped(hornId);
+
+        market.markHornShipped(hornId, DKDKDKDKDKDK);
+
         // check that approval for __hornId given to marketplace contract was carried out
+        // assert.    dkdkdk
     } // javascript version should expect hornShipped event emission with correct address
 
     // @dev Attempts to mark shipped with a wrong address
     function testMarkAsShippedWithWrongAddress() public {
-        // Set conditions of exchange up to point where markHornShipped would be called
-        // Reusable coded functions can bake this all into helper functions that create a fresh marketplace and fresh NFT for every test
-        market.mintThenListNewHornNFT(
-            "Berg", 
-            "Double", 
-            "Geyer", 
-            123456, 
-            4200000000000000000
-        );
+        // First sets conditions of exchange up to point where markHornShipped would be called
+        freshMarketplaceInstance();
+        mintAndListFreshTestHorn();
         // if this doesnt work due to internal keyword on counters.counter, add a temporary test function in marketplace contract that returns _hornId.current()
         uint hornId = market._hornId.current();
+        prepareForShipped(hornId); // work following setup lines into this helper function
+
         // Set correct address to prepare for comparison with the mistake address later entered by seller
         realShipTo = "21 Mil St. BTCidatel, Metaverse 69696";
         // Purchase NFT so it is primed for a markHornShipped() call
@@ -98,33 +133,47 @@ contract TestHornMarketplace {
         assert.isFalse(mistakenShippingAddress, "A seller somehow managed to ship a horn to the wrong address");
     }
 
-    // @dev Ensure only Buyers can mark horn received
-    function testMarkHornDeliveredAndOwnershipTransferred(uint __hornId) public {
-        market.markHornDeliveredAndOwnershipTransferred(__hornId);
-        // Check that HornStatus status of hornNFT was correctly updated to OwnedNotForSale (== 3)
-        testGetStatusOfHornById(__hornId, 3);
+    // @dev Ensure markHornDeliveredAndOwnershipTransferred is working as intended
+    function testMarkHornDeliveredAndOwnershipTransferred() public {
+        // First sets conditions of exchange up to the point where markHornDeliveredAndOwnershipTransferred would be called
+        freshMarketplaceInstance();
+        mintAndListFreshTestHorn();
+
+        uint hornId = market._hornId.current(); // if this getter doesnt work then use a temporary testing getter function to return current id
+        prepareForShipped(hornId);
+        market.markHornDeliveredAndOwnershipTransferred(hornId); // ^
+        // Check that HornStatus status of hornNFT was correctly updated to OwnedNotForSale (== 3?)
+        testGetStatusOfHornById(hornId, HornStatus.OwnedNotForSale);
         // Check that currentOwner was correctly updated to buyer
-        address payable currentOwnerViaMapping = market.getCurrentOwnerByMapping(__hornId);
-        assert.equal(currentOwnerViaMapping, payable(address(this)), "errmsg"); //if address(this) is not considered msg.sender, use msg.sender as second parameter instead
+        address payable currentOwnerViaMapping = market.getCurrentOwnerByMapping(hornId);
+        assert.equal(currentOwnerViaMapping, payable(address(this)), "CurrentOwner of Horn NFT as returned by storage mapping does not match expected address"); //if address(this) is not considered msg.sender, use msg.sender as second parameter instead
         // Check that currentOwner is consistent in both the mapping and the struct attribute
-        testGetCurrentOwnerMappingAgainstStructAttributeByHornId(__hornId);
-    } // should expect HornDelivered event emission with correct seller, buyer addresses
+        testGetCurrentOwnerMappingAgainstStructAttributeByHornId(hornId);
+        // Check that ERC721 method safeTransferFrom was executed properly
+        // return balanceOf(address(this)); // wrap payable? use msg.sender? import ierc721?
+    } // Javascript mirror test should expect HornDelivered event emission with correct seller, buyer addresses
 
     // @notice Modifier tests to ensure that access control and other modifier functions work properly
     // maybe put these test functions in the Helper Function section below ?
     /* 
-    * // attempts to call transfer ownership function from non-buyer address who didn't pay
+    * // @dev Attempts to call transfer ownership function from non-buyer address without paying
+      // @dev Ensures only buyer can markHornDeliveredAndOwnershipTransferred
     * function testOnlyBuyerWhoPaid() public {
-        // does Counters.Counter _hornId struct have getter? (made public for testing)
+        //fresh instances and minds?
+
+        mintAndListFreshTestHorn();
         uint hornId = market._hornId.current(); // identify most recent Horn NFT
-        
+        // prepareForShipped(hornId);
+
         bool thieveryAttempt = market.markHornDeliveredAndOwnershipTransferred(hornId); // {from: msg.sender} may need this line because this contract isn't an IERC721TokenReceiver to pass the market's safeTransferFrom() method
         // make sure state of nft is correct except for onlyBuyer()
 
         assert.isFalse(thieveryAttempt, "An account that hasn't paid or been marked as buyer pilfered the NFT!");
     }
-    * // attempts to call listExistingHornNFT() From non-seller address who isn't currentOwner of the horn
-    * function testOnlySeller() public {
+    * // @dev Attempts to call listExistingHornNFT() From non-seller address who isn't currentOwner of the horn
+    * function testOnlySellerViaList() public {
+        // fresh instances and mints?
+
         uint hornId = market._hornId.current(); // identify most recent horn NFT
         // impersonator tries to sell someone else's NFT for 1 ether
         bool sellerImpersonation = market.listExistingHornNFT(hornId, 1000000000000000000); // {from: accounts[1]} may need this line so address calling function isn't the same one who minted
@@ -132,8 +181,18 @@ contract TestHornMarketplace {
 
         assert.isFalse(sellerImpersonation, "A rogue account was able to sell a horn NFT that it didn't own");
     }
+    * function testOnlySellerViaMarkShipped() public {
+        //fresh instances and miints?
+
+        uint hornId = market._hornId.current();
+        bool shipperImpersionation = market.markHornShipped(hornId, "4 Ju St. ShipsVille, Virgin Beach 66666");
+
+        assert.isFalse(shipperImpersonation, "A pirate just impersonated a shipper and shipped a horn they don't own");
+    }
     * // attempts to call purchaseHornById without having paid enough ETH
     * function testPaidEnough() public {
+        //fresh instances and mints?
+
     /*  uint hornId = market._hornId.current(); // identify most recent horn NFT
         bool paidTooMuch = market.purchaseHornByHornId(
             hornId, 
@@ -145,6 +204,8 @@ contract TestHornMarketplace {
     }
     * // attempts to call purchaseHornById on a horn that is not currently for sale
     * function testForSale() public {
+        //fresh instances and mints?
+
         uint hornId = market._hornId.current(); // identify most recent horn NFT
         market.initiateRefundOrSetStatusToOwnedNotForSale(hornId); // set to OwnedNotForSale enum
         bool yourMoneyNotWelcomeHere = market.purchaseHornByHornId(
@@ -157,6 +218,8 @@ contract TestHornMarketplace {
     
     // attempts to call markHornShipped when horn is not yet paid for in escrow
     * function testHornPaidFor() public {
+        // fresh instances and mints?
+
         uint hornId = market._hornId.current(); // identify most recent horn NFT
         bool stillWaitingOnFunds = market.markHornShipped(hornId);
         // set state of nft to be correct except hornPaidFor()
@@ -165,23 +228,29 @@ contract TestHornMarketplace {
     }
     // attempts to call markHornDeliveredAndOwnershipTransferred when horn is not yet marked shipped by seller
     * function testShipped() public {
+        // fresh instances and mints? 
+
         uint hornId = market._hornId.current(); // identify most recent horn NFT
         bool notShippedYet = market.
         // set state of nft to be correct except shipped()
 
         assert.isFalse(notShippedYet, "Horn can not be marked delivered and NFT ownership transferred since it has not yet been marked shipped");
     }
-    // attempts to mint a duplicate Horn NFT, which should fail the nonDuplicateMint modifier
-    * function copycatTriedCopyPaste() public {
-        market.mintFreshTestHorn();
+    // @dev Attempts to mint a duplicate Horn NFT, which should fail the nonDuplicateMint modifier
+    function testNonDuplicateMint() public {
+        // fresh instances and mints?
 
-        market.mintThenListNewHornNFT(
+        market.mintAndListFreshTestHorn();
+
+        bool copycatMint = market.mintThenListNewHornNFT(
             "Berg",
             "Double",
             "Geyer",
             serialNumberCounter,
             4200000000000000000
         );
+
+        assert.isFalse(copycatMint, "A corrupt copycat was able to mint a Horn NFT with duplicate hash of make and serialNumber");
     }
     */
 
@@ -190,9 +259,14 @@ contract TestHornMarketplace {
     *  
     *   To be used both generally outside transactions as well as inside main tests for behavior tracking
     */
+    // @dev Instantiates a fresh instance of the Horn Marketplace contract for cleaner testing
+    // @notice Intended to be used prior to nearly every test, except ones that rely on having existing NFTs or hornIds
+    function freshMarketplaceInstance() public {
+        market = new HornMarketplace();
+    }
     // @dev Mints a fresh Horn NFT for testing purposes
     // @param serialNumberCounter is incremented every time this function is called so that the nonDuplicateMint modifier hashes make and serial data without collision
-    function mintFreshTestHorn() public returns (uint) {
+    function mintAndListFreshTestHorn() public returns (uint) {
         serialNumberCounter++;
         market.mintThenListNewHornNFT(
             "Berg",
@@ -204,6 +278,10 @@ contract TestHornMarketplace {
 
         return serialNumberCounter;
     }
+    // @dev Prepares a given Horn NFT for markShipped testing
+    function prepareForShipped(uint hornId) public {}
+    // @dev Prepares a given Horn NFT for markHornDelivered and transfer testing
+    function prepareForTransfer(uint hornId) public {}
     // @dev Test price getter function of listPrice attribute inside horn struct of given HornId
     // @notice This function is used as a helper at different stages of the transaction to track intended behavior
     function testGetListPriceByHornId(uint __hornId) public returns (bool) {

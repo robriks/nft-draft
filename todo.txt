@@ -43,7 +43,8 @@ Horn NFT Contract:
 
 Test Contract:
 -certain tests cannot be carried out in Solidity via a testing smart contract: notably EVENTS, LOGS must be done in javascript
--if nested test helper functions with assert() do not work properly inside larger test host functions, simply rework the helpers to return a bool or other value that can be compared in a final larger assert() in the host function
+-change nested test helper functions by removing assert() line and simply rework helpers to return bool or other value and then compare in a final assert() in larger host functions
+  change their names from testblabedyblabla to returnGetWhateverValue and put that helper function into assert like so: assert(returnGetWhateverValue, expectedValue)
 -check how Enum values are passed into test values as a parameter. Consider wrapping in uint(HornStatus.forSale) or using forSale instead of HornStatus.forSale. or maybe just plain uints 0, 1, 2?
 
 

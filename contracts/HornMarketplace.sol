@@ -65,13 +65,13 @@ contract HornMarketplace is Ownable, /*IERC721Receiver, */ERC721Enumerable {
 
     // @notice horns mapping keeps track of all horn NFT owners & histories via _hornId (s/o to OpenZep Counter.counter library)
     mapping (uint => Horn) horns;
-    // @dev Add hash of horn NFT make and serialNumber using Counter.counter to compare all hashes to new mints in an effort to avoid duplicate NFTs of single instruments
-    // mapping (uint => bytes memory) makeAndSerialHashes; // bytes32? bytes memorY?
+    // @dev Add hash of horn NFT make and serialNumber using Counter.counter to compare all existing hashes to new mints to prevent duplicate NFTs of the same instrument
+    mapping (uint => bytes memory) makeAndSerialHashes; // bytes32? bytes memorY?
     // @dev currentOwners and buyers mappings used for function access control
     // @dev Add address to buyers when horn is paid for via escrow, address to currentOwners when sale and exchange is complete
     mapping (uint => address) currentOwners;
     mapping (uint => address) buyers;
-    mapping (address => string) shippingAddresses;
+    mapping (address => string) shippingAddresses; // @param May actually be cheaper to enter and store bytes type via front-end
     
     // @notice NFT and IRL exchange events and escrow transaction events used for front-end
     event HornListedForSale(uint indexed hornId, address indexed seller, string indexed make);
@@ -94,15 +94,15 @@ contract HornMarketplace is Ownable, /*IERC721Receiver, */ERC721Enumerable {
     // }
 
     // @dev Restrict duplicate listings and allow only users who are minting their instrument as an NFT for the first time by checking hashes of concatenated make and serial number
-    // modifier nonDuplicateMint(string make, uint32 serialNumber) internal pure returns (bool) {
-    //   //Hash _make and _serialNumber given by user
-    //   bytes memory hashOfMakeAndSerial = keccak256(abi.encodePacked(_make + _serialNumber)); // bytes32? bytes memory?
-    //   //Loop through makeAndSerialHashes[] mapping in search for a matching hash, in which case given user input is a duplicate mint
-    //   for (i = 0, i < horns[].length, i++) {
-    //     require(makeAndSerialHashes[i] != hashOfMakeAndSerial);
-    //   }
-    //   _;
-    // }
+    modifier nonDuplicateMint(string make, uint32 serialNumber) internal pure returns (bool) {
+        //Hash concatenated _make and _serialNumber given by user
+        bytes memory hashOfMakeAndSerial = keccak256(abi.encodePacked(_make + _serialNumber)); // bytes32? bytes memory?
+        //Loop through makeAndSerialHashes[] mapping in search for a matching hash, in which case given user input is a duplicate mint
+        for (i = 0, i < horns[].length, i++) {
+           require(makeAndSerialHashes[i] != hashOfMakeAndSerial);
+        }
+        _;
+    }
     // @dev Restrict to only buyer who paid and was added to buyers[] mapping
     modifier onlyBuyerWhoPaid(uint hornId) {
         require(buyers[hornId] == msg.sender, "This function may only be called by a buyer who has already paid");
@@ -147,24 +147,24 @@ contract HornMarketplace is Ownable, /*IERC721Receiver, */ERC721Enumerable {
     // IF NEW FUNCTION, MAKE SURE ALL MAPPINGS/ATTRIBUTES ARE PROPERLY SET so escrow functions still work on correct addresses (ie line 191)
     // ALSO CHANGE THIS FUNCTION to have an if clause that allows a minter to mint NFT without listing it for sale (for ownership historical record)
     function mintThenListNewHornNFT( 
-        string calldata _make, 
-        string calldata _model, 
-        string calldata _style, 
-        uint32 _serialNumber, 
-        uint32 _desiredPrice) 
-        external 
-        /* nonDuplicateMint(uint(_hornId.current())++, _make, _serialNumber) */ // double check how the Counter.counter works with _hornId in a modifier _; setting
-        returns (uint) {
-          // @dev listPrice attribute cannot be set to 0
-          require(_desiredPrice > 0, "Your Horn is valuable and cannot be sold for free!");
-          // @dev Increment counter _hornId then store publicly accessible hornId using current counter
-          _hornId.increment();
-          uint hornId = _hornId.current();
-          _mint(msg.sender, hornId);
-          // _setTokenURI logic still needs to be implemented
+      string calldata _make, 
+      string calldata _model, 
+      string calldata _style, 
+      uint32 _serialNumber, 
+      uint32 _desiredPrice) 
+      external 
+      /* nonDuplicateMint(uint(_hornId.current())++, _make, _serialNumber) */ // double check how the Counter.counter works with _hornId in a modifier _; setting
+      returns (uint) {
+        // @dev listPrice attribute cannot be set to 0
+        require(_desiredPrice > 0, "Your Horn is valuable and cannot be sold for free!");
+        // @dev Increment counter _hornId then store publicly accessible hornId using current counter
+        _hornId.increment();
+        uint hornId = _hornId.current();
+        _mint(msg.sender, hornId);
+        // _setTokenURI logic still needs to be implemented
           
-          // @dev Store all horn metadata on-chain EXCEPT images which are stored externally via URI
-          horns[hornId] = Horn({
+        // @dev Store all horn metadata on-chain EXCEPT images which are stored externally via URI
+        horns[hornId] = Horn({
             make: _make,
             model: _model,
             style: _style,
@@ -172,16 +172,51 @@ contract HornMarketplace is Ownable, /*IERC721Receiver, */ERC721Enumerable {
             listPrice: _desiredPrice,
             status: HornStatus.ListedForSale,
             currentOwner: payable(msg.sender)
-          });
+        });
                     
-          // @dev update mappings and arrays to reflect new listing
-          currentOwners[hornId] = msg.sender;
-          hornsForSale.push(hornId);
+        // @dev update mappings and arrays to reflect new listing
+        currentOwners[hornId] = msg.sender;
+        hornsForSale.push(hornId);
 
-          emit HornListedForSale(hornId, msg.sender, _make);
+        emit HornListedForSale(hornId, msg.sender, _make);
+
+        return hornId;
+    }
+
+    // following function mints an NFT that is not intended to be listed for sale; owner only wants to establish verifiable immutable record of ownership
+    function mintButDontListNewHornNFT(
+      string calldata _make,
+      string calldata _model,
+      string calldata _style,
+      uint32 _serialNumber,
+      uint32 _desiredPrice) 
+      external
+      nonDuplicateMint(_hornId.current(), _make, _serialNumber) 
+      returns (uint) {
+        // @dev Increment counter _hornId then store publicly accessible hornId using current counter
+        _hornId.increment();
+        uint hornId = _hornId.current();
+        _mint(msg.sender, hornId);
+        // _setTokenURI logic still needs to be implemented
+
+        // @dev Store all horn metadata on-chain EXCEPT images which are stored externally via URI
+        horns[hornId] = Horn({
+            make: _make,
+            model: _model,
+            style: _style,
+            serialNumber: _serialNumber,
+            listPrice: 0,
+            status: HornStatus.OwnedNotForSale,
+            currentOwner: payable(msg.sender)
+        });
+
+          // @dev update mappings to reflect new mint
+          currentOwners[hornId] = msg.sender;
+
+          emit NewHornNFTMinted(hornId, msg.sender, _make);
 
           return hornId;
-    }
+        }
     
     // following function must check that the hornNFT already exists!  and onlySeller(id) checks that it is owned by the caller of the function
     function listExistingHornNFT(uint __hornId, uint32 _desiredPrice) 
@@ -203,41 +238,6 @@ contract HornMarketplace is Ownable, /*IERC721Receiver, */ERC721Enumerable {
         return hornId;
     }
 
-    // following function mints an NFT that is not intended to be listed for sale; owner only wants to establish verifiable immutable record of ownership
-        function mintButDontListNewHornNFT(
-          string calldata _make,
-          string calldata _model,
-          string calldata _style,
-          uint32 _serialNumber,
-          uint32 _desiredPrice) 
-          external
-          nonDuplicateMint(_hornId.current(), _make, _serialNumber) 
-          returns (uint) {
-            // @dev Increment counter _hornId then store publicly accessible hornId using current counter
-            _hornId.increment();
-            uint hornId = _hornId.current();
-            _mint(msg.sender, hornId);
-            // _setTokenURI logic still needs to be implemented
-
-            // @dev Store all horn metadata on-chain EXCEPT images which are stored externally via URI
-            horns[hornId] = Horn({
-              make: _make,
-              model: _model,
-              style: _style,
-              serialNumber: _serialNumber,
-              listPrice: 0,
-              status: HornStatus.OwnedNotForSale,
-              currentOwner: payable(msg.sender)
-            });
-
-            // @dev update mappings to reflect new mint
-            currentOwners[hornId] = msg.sender;
-
-            emit NewHornNFTMinted(hornId, msg.sender, _make);
-
-            return hornId;
-        }
-
     // @dev Require that given __hornId is forSale and not already purchased
     function purchaseHornByHornId(uint __hornId, string calldata _shipTo) // maybe use bytes for address, remove spaces and concatenate in frontend input? so it can be hashed and stored privately
       public 
@@ -253,6 +253,7 @@ contract HornMarketplace is Ownable, /*IERC721Receiver, */ERC721Enumerable {
         // @dev Forward payment to escrow contract for safekeeping
         escrow.deposit(currentOwners[__hornId]);
         // @dev Add shipping address of buyer aka msg.sender to mapping for later confirmation
+        // @param May be cheaper gas wise to enter bytes instead of string type in front end
         shippingAddresses[msg.sender] = _shipTo;
         // @dev Add msg.sender to buyers[] mapping for access control checking during markHornShipped function call and shipping address confirmation: 
         buyers[__hornId] = msg.sender;
