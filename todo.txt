@@ -48,6 +48,8 @@ Test Contract:
 -certain tests cannot be carried out in Solidity via a testing smart contract: notably EVENTS, LOGS must be done in javascript
 -change nested test helper functions by removing assert() line and simply rework helpers to return bool or other value and then compare in a final assert() in larger host functions
   change their names from testblabedyblabla to returnGetWhateverValue and put that helper function into assert like so: assert(returnGetWhateverValue, expectedValue)
+-look closely at how PAYABLE functions (prepareForShipped) are tested: msg.value needs to be included within the test AND matched to exactly the listPrice attribute of each NFT struct
+  use {value: 420} and {from: accounts[1]} ?  
 -check how Enum values are passed into test values as a parameter. Consider wrapping in uint(HornStatus.forSale) or using forSale instead of HornStatus.forSale. or maybe just plain uints 0, 1, 2?
 
 

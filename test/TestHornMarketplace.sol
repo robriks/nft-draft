@@ -254,21 +254,25 @@ contract TestHornMarketplace {
     }
     */
 
-    /*
-    *   Helper Functions 
-    *  
-    *   To be used both generally outside transactions as well as inside main tests for behavior tracking
-    */
-    // @dev Instantiates a fresh instance of the Horn Marketplace contract for cleaner testing
-    // @notice Intended to be used prior to nearly every test, except ones that rely on having existing NFTs or hornIds
-    function freshMarketplaceInstance() public {
-        market = new HornMarketplace();
+
+    // @dev Tests internal enum HornStatus functions to ensure that a currentOwner may change their mind about whether to list an instrument for sale
+    function testSellerInitiateRefundOrSetStatusToOwnedNotForSale() public {
+       // set conditions to identify an NFT that is ListedForSale
+       freshMarketplaceInstance();
+       mintAndListFreshHornNFT(); 
+
+       uint hornId = market._hornId.current();
+       HornStatus returnedStatus = market.sellerInitiateRefundOrSetStatusToOwnedNotForSale(hornId);
+       HornStatus expectedStatus = HornStatus.OwnedNotForSale;
+
+       assert.equal(returnedStatus, expectedStatus, "HornStatus returned by sellerInitiateRefundOrSetStatusToOwnedNotForSale() did not match HornStatus.OwnedNotForSale");
     }
-    // @dev Mints a fresh Horn NFT for testing purposes
-    // @param serialNumberCounter is incremented every time this function is called so that the nonDuplicateMint modifier hashes make and serial data without collision
-    function mintAndListFreshTestHorn() public returns (uint) {
-        serialNumberCounter++;
-        market.mintThenListNewHornNFT(
+
+    // @dev Tests internal function from every angle to ascertain that if and else if clauses in sellerInitiateRefundOrSetStatusToOwnedNotForSale are working as intended
+    function testSellerInitiateRefundOrSetStatusToOwnedNotForSaleFromOwnedNotForSale() public {
+        // set conditions to identify an NFT that is OwnedNotForSale
+        freshMarketplaceInstance();
+        market.mintButDontListNewHornNFT(
             "Berg",
             "Double",
             "Geyer", 
@@ -276,23 +280,92 @@ contract TestHornMarketplace {
             4200000000000000000
         );
 
-        return serialNumberCounter;
-    }
-    // @dev Prepares a given Horn NFT for markShipped testing
-    function prepareForShipped(uint hornId) public {
-        string memory testShipTo = "21 Mil St. BTCidatel, Metaverse 69696";
+        uint hornId = market._hornId.current();
+        bool revertedByElseIf = market.sellerInitiateRefundOrSetStatusToOwnedNotForSale(hornId);
 
-        market.purchaseHornByHornId(hornId, testShipTo);
+        assert.isFalse(revertedByElseIf, "Function call error; it should have reverted because Horn is already set to OwnedNotForSale");
     }
-    // @dev Prepares a given Horn NFT for markHornDelivered and transfer testing
-    function prepareForTransfer(uint hornId) public {
-        string memory testShipTo = "21 Mil St. BTCidatel, Metaverse 69696";
+
+    // @notice This test MUST be updated when/if refund logic is implemented in the marketplace and escrow contracts
+    function testSellerInitiateRefundOrSetStatusToOwnedNotForSaleFromPaidFor() public {
+        // set conditions to identify an NFT that is PaidFor
+        freshMarketplaceInstance();
+        mintAndListFreshHorn();
+
+        uint hornId = market._hornId.current();
+        prepareForShipped(hornId); // {value:} {from:}
+
+        bool tooLateTakeTheMoney = market.sellerInitiateRefundOrSetStatusToOwnedNotForSale(hornId);
+
+        assert.isFalse(tooLateTakeTheMoney, "Seller broke the rules and manipulated HornStatus even after Horn NFT was purchased and paid for by a buyer. That should only be possible after refunds are enabled");
+    }
+    // @notice This test has seller attempt to initiate refund despite them already having shipped the instrument
+    function testSellerInitiateRefundOrSetStatusToOwnedNotForSaleFromShipped() public {
+        // set conditions to identify an NFT that is Shipped
+        freshMarketplaceInstance();
+        mintAndListFreshHorn();
+
+        uint hornId = market._hornId.current();
+        prepareForShipped(hornId); // {value:}{from:}
+        prepareForTransfer(hornId);
+
+        bool youAlreadyShippedItYouScammer = market.sellerInitiateRefundOrSetStatusToOwnedNotForSale(hornId);
+
+        assert.isFalse(youAlreadyShippedItYouScammer, "Evil scammer managed to set Horn NFT to OwnedNotForSale even after shipping the instrument");
+    }
+
+    /*
+        Tests for getter functions
+    */
+    // @dev Tests the basic behavior of the hornsForSale[] uint[] array
+    function testGetCurrentHornsForSale() public {
+        // set conditions to have three NFTs for sale and one not for sale
+        freshMarketplaceInstance();
+        mintAndListFreshHorn(); // Id should == 1
+        mintAndListFreshHorn(); // Id should == 2
+        market.mintButDontListNewHornNFT( // Id should == 3
+            "Berg",
+            "Double",
+            "Geyer", 
+            serialNumberCounter,
+            4200000000000000000
+        );
+        mintAndListFreshHorn(); // Id should == 4
         
-        market.markHornShipped(hornId, testShipTo);
+        uint[] returnedIds = market.getCurrentHornsForSale();
+        uint[] expectedIds = [1, 2, 4];
+
+        assert.equal(returnedIds, expectedIds, "hornsForSale[] uint[] array does not return expected hornIds of the lovely mints being tested");
     }
+    // @dev Tests the more complicated behavior of the hornsForSale[] uint[] array by calling purchaseHornByHornId which deletes hornIds when they are purchased
+    function testGetCurrentHornsForSaleAfterDeletionViaPurchaseHornByHornId() public {
+        // set conditions to have three NFTs for sale and one not for sale, then purchases 2 and 4, removing them from hornsForSale[] array
+        freshMarketplaceInstance();
+        mintAndListFreshHorn(); // Id should == 1
+        mintAndListFreshHorn(); // Id should == 2
+        uint firstTestHornId = market._hornId.current(); // should == 2
+        market.mintButDontListNewHornNFT( // Id should == 3
+            "Berg",
+            "Double",
+            "Geyer", 
+            serialNumberCounter,
+            4200000000000000000
+        );
+        // @dev Purchases the listed firstTestHornId and thereby 'deletes' it from the hornsForSale[] uint[] array by resetting its value to 0
+        prepareForShipped(firstTestHornId); // {value:,from:}
+        mintAndListFreshHorn(); // Id should == 4
+        uint secondTestHornId = market._hornId.current(); // should == 4
+        prepareForShipped(secondTestHornId);
+        // @dev Purchases the listed secondTestHornId and thereby 'deletes' it from the hornsForSale[] uint[] array by resetting its value to 0
+        
+        uint[] returnedIds = market.getCurrentHornsForSale();
+        uint[] expectedIds = [1, 0, 0]; // originally [1, 2, 4] but 2 and 4 get zeroed out by purchases
+
+        assert.equal(returnedIds, expectedIds, "hornsForSale[] uint[] array does not return expected hornId values after minting/listing/purchasing a selection of juicy NFTs");
+    }
+
     // @dev Test price getter function of listPrice attribute inside horn struct of given HornId
     // @notice This function is used as a helper at different stages of the transaction to track intended behavior
-    function testGetCurrentHornsForSale() public {}
     function testGetListPriceByHornId(uint __hornId) public returns (bool) {
         uint expectedPrice = horns[__hornId].listPrice;
         uint returnedPrice = market.testGetListPriceByHornId(__hornId);
@@ -335,25 +408,31 @@ contract TestHornMarketplace {
         uint correctDepositValue = market.escrow.depositsOf(payee);
         // if this doesnt work as a nested test, just use a require() statement so this function returns (bool) which is easy to work with in the larger host functions
         assert.equal(returnedDepositValue, correctDepositValue, "Value returned by getEscrowDepositValue does not match escrow depositsOf method");
-    } 
-}
-    // @dev Test internal function to ensure that a currentOwner may change their mind about whether to list an instrument for sale
-    function testSellerInitiateRefundOrSetStatusToOwnedNotForSale() public {
-       // set conditions to identify an NFT that is ListedForSale
-       freshMarketplaceInstance();
-       mintAndListFreshHornNFT(); 
-
-       uint hornId = market._hornId.current();
-       HornStatus returnedStatus = market.sellerInitiateRefundOrSetStatusToOwnedNotForSale(hornId);
-       HornStatus expectedStatus = HornStatus.OwnedNotForSale;
-
-       assert.equal(returnedStatus, expectedStatus, "HornStatus returned by sellerInitiateRefundOrSetStatusToOwnedNotForSale() did not match HornStatus.OwnedNotForSale");
     }
-    // @dev Tests internal function from every angle to ascertain that if and else if clauses in sellerInitiateRefundOrSetStatusToOwnedNotForSale are working as intended
-    function testSellerInitiateRefundOrSetStatusToOwnedNotForSaleFromOwnedNotForSale() public {
-        // set conditions to identify an NFT that is OwnedNotForSale
-        freshMarketplaceInstance();
-        market.mintButDontListNewHornNFT(
+
+    // @dev Test the behavior of marketplace contract on receipt of only ETH without data
+    // @dev Should revert on receipt of ETH without msg.data via fallback() function
+    function testIncomingEther() public payable {
+        bool dryEthSend = market.call{ value: 10000000000000000 }();
+
+        assert.isFalse(dryEthSend, "Warning: a suspiciously generous soul donated funds to the marketplace contract without msg.data");
+    }
+
+    /*
+    *   Helper Functions 
+    */
+    //  To be used both generally outside transactions as well as inside main tests for behavior tracking
+
+    // @dev Instantiates a fresh instance of the Horn Marketplace contract for cleaner testing
+    // @notice Intended to be used prior to nearly every test, except ones that rely on having existing NFTs or hornIds
+    function freshMarketplaceInstance() public {
+        market = new HornMarketplace();
+    }
+    // @dev Mints a fresh Horn NFT for testing purposes
+    // @param serialNumberCounter is incremented every time this function is called so that the nonDuplicateMint modifier hashes make and serial data without collision
+    function mintAndListFreshTestHorn() public returns (uint) {
+        serialNumberCounter++;
+        market.mintThenListNewHornNFT(
             "Berg",
             "Double",
             "Geyer", 
@@ -361,41 +440,18 @@ contract TestHornMarketplace {
             4200000000000000000
         );
 
-        uint hornId = market._hornId.current();
-        bool revertedByElseIf = market.sellerInitiateRefundOrSetStatusToOwnedNotForSale(hornId);
-
-        assert.isFalse(revertedByElseIf, "Function call error; it should have reverted because Horn is already set to OwnedNotForSale");
+        return serialNumberCounter;
     }
-    // @notice This test MUST be updated when/if refund logic is implemented in the marketplace and escrow contracts
-    function testSellerInitiateRefundOrSetStatusToOwnedNotForSaleFromPaidFor() public {
-        // set conditions to identify an NFT that is PaidFor
-        freshMarketplaceInstance();
-        mintAndListFreshHorn();
+    // @dev Prepares a given Horn NFT for markShipped testing
+    // @param This function must be given a msg.value to carry out the market.purchaseHornByHornId line
+    function prepareForShipped(uint hornId) public /*payable*/ {
+        string memory testShipTo = "21 Mil St. BTCidatel, Metaverse 69696";
 
-        uint hornId = market._hornId.current();
-        prepareForShipped(hornId);
-
-        bool tooLateTakeTheMoney = market.sellerInitiateRefundOrSetStatusToOwnedNotForSale(hornId);
-
-        assert.isFalse(tooLateTakeTheMoney, "Seller broke the rules and manipulated HornStatus even after Horn NFT was purchased and paid for by a buyer. That should only be possible after refunds are enabled");
+        market.purchaseHornByHornId(hornId, testShipTo); // {value: 420??} {from: ??}
     }
-    function testSellerInitiateRefundOrSetStatusToOwnedNotForSaleFromShipped() public {
-        // set conditions to identify an NFT that is Shipped
-        freshMarketplaceInstance();
-        mintAndListFreshHorn();
-
-        uint hornId = market._hornId.current();
-        prepareForShipped(hornId);
-        prepareForTransfer(hornId);
-
-        bool youAlreadyShippedItYouScammer = market.sellerInitiateRefundOrSetStatusToOwnedNotForSale(hornId);
-
-        assert.isFalse(youAlreadyShippedItYouScammer, "Evil scammer managed to set Horn NFT to OwnedNotForSale even after shipping the instrument");
-    }
-    // @dev Test the behavior of marketplace contract on receipt of only ETH without data
-    // @dev Should revert on receipt of ETH without msg.data via fallback() function
-    function testIncomingEther() public payable {
-        bool dryEthSend = market.call{ value: 10000000000000000 }();
-
-        assert.isFalse(dryEthSend, "Warning: a suspiciously generous soul donated funds to the marketplace contract without msg.data");
+    // @dev Prepares a given Horn NFT for markHornDelivered and transfer testing
+    function prepareForTransfer(uint hornId) public {
+        string memory testShipTo = "21 Mil St. BTCidatel, Metaverse 69696";
+        
+        market.markHornShipped(hornId, testShipTo);
     }

@@ -61,7 +61,7 @@ contract HornMarketplace is Ownable, /*IERC721Receiver, */ERC721Enumerable {
     // @dev hornId is a unique, publicly accessible counter (as opposed to Counter _hornId) for each horn NFT in existence
     // @dev hornsForSale array allows for quickly viewing listed instruments via frontend
     // address payable owner;
-    uint[] hornsForSale;
+    uint[] public hornsForSale;
 
     // @notice horns mapping keeps track of all horn NFT owners & histories via _hornId (s/o to OpenZep Counter.counter library)
     mapping (uint => Horn) horns;
@@ -263,7 +263,7 @@ contract HornMarketplace is Ownable, /*IERC721Receiver, */ERC721Enumerable {
                 delete hornsForSale[i];
             }
         }
-        
+
         // @notice Emit event to notify seller via frontend that horn is paid for and must be shipped
         emit HornPurchased(__hornId, _shipTo, msg.sender);
         emit DepositedToEscrow(horns[__hornId].currentOwner, msg.value);
@@ -315,6 +315,28 @@ contract HornMarketplace is Ownable, /*IERC721Receiver, */ERC721Enumerable {
         return paymentAmt;
     }
     
+    // @dev Function that sets status of existing horn NFT to OwnedNotForSale, 
+    // @notice Used in case minter only wants verifiable historical record or owner decides not to sell the instrument after listing or wishes to refund a buyer
+    // @notice Must be set to internal after testing is done, only temporarily set to public for testing purposes
+    function sellerInitiateRefundOrSetStatusToOwnedNotForSale(uint __hornId) public /*internal onlySeller()*/ returns (HornStatus) {
+        if (horns[__hornId].status == HornStatus.ListedForSale) {
+            horns[__hornId].status = HornStatus.OwnedNotForSale;
+        } else if (horns[__hornId].status == HornStatus.PaidFor) {
+            revert("Horn has already been purchased and paid for by a buyer and on-chain refunds are not currently supported"); // change this line once refund logic is implemented
+            //REFUND LOGIC HERE: escrow.refundToBuyer(); functino refundToBuyer() probably has a nested mapping of address => uint => enum == buyer => deposits => state.refundable / state.nonrefundable that gets updated when horn is markShipped
+            // refund logic could probably include this next line within the refund function
+            // horns[__hornId].status = HornStatus.OwnedNotForSale;
+        } else if (horns[__hornId].status == HornStatus.Shipped) {
+            revert("Horn has already been shipped and no longer qualifies for a refund, please complete the exchange and redo the exchange in reverse if you wish to switch back ownership");
+        } else if (horns[__hornId].status == HornStatus.OwnedNotForSale) {
+            revert("Horn is already marked as owned and not for sale");
+        }
+
+        return(HornStatus.OwnedNotForSale); // make sure this is correct syntax
+    }
+
+    // function buyerInitiateRefund() does the buyer even need an option to get a refund once paid?
+
     /*
         Helper functions that provide (internal?) getter functionality
     */
@@ -343,28 +365,6 @@ contract HornMarketplace is Ownable, /*IERC721Receiver, */ERC721Enumerable {
     function getEscrowDepositValue(address payee) public view returns (uint) {
         escrow.depositsOf(payee);
     }
-
-    // @dev Helper function that sets status of existing horn NFT to OwnedNotForSale, 
-    // @notice Used in case minter only wants verifiable historical record or owner decides not to sell the instrument after listing or wishes to refund a buyer
-    // @notice Must be set to internal after testing is done, only temporarily set to public for testing purposes
-    function sellerInitiateRefundOrSetStatusToOwnedNotForSale(uint __hornId) public /*internal onlySeller()*/ returns (HornStatus) {
-        if (horns[__hornId].status == HornStatus.ListedForSale) {
-            horns[__hornId].status = HornStatus.OwnedNotForSale;
-        } else if (horns[__hornId].status == HornStatus.PaidFor) {
-            revert("Horn has already been purchased and paid for by a buyer and on-chain refunds are not currently supported"); // change this line once refund logic is implemented
-            //REFUND LOGIC HERE: escrow.refundToBuyer(); functino refundToBuyer() probably has a nested mapping of address => uint => enum == buyer => deposits => state.refundable / state.nonrefundable that gets updated when horn is markShipped
-            // refund logic could probably include this next line within the refund function
-            // horns[__hornId].status = HornStatus.OwnedNotForSale;
-        } else if (horns[__hornId].status == HornStatus.Shipped) {
-            revert("Horn has already been shipped and no longer qualifies for a refund, please complete the exchange and redo the exchange in reverse if you wish to switch back ownership");
-        } else if (horns[__hornId].status == HornStatus.OwnedNotForSale) {
-            revert("Horn is already marked as owned and not for sale");
-        }
-
-        return(HornStatus.OwnedNotForSale); // make sure this is correct syntax
-    }
-
-    // function buyerInitiateRefund() does the buyer even need an option to get a refund once paid?
 
     fallback() public payable returns (bool) {
         revert("Please do not send this contract funds without any function call data or call a function that doesn't exist");
