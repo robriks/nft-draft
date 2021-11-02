@@ -8,6 +8,9 @@ Web-App:
           Yes/No: mintThenListNewHornNFT() / mintButDontListNewHornNFT()
     /about HornMarketplace is a place for you to interface with the Ethereum blockchain ...
     /marketplace Check out the great horns listed for sale!
+      -reads getHornsForSale() function from marketplace contract (returns array uint[] of all horns for sale)
+        -use returned hornIds to render component that displays information (images, struct attributes like make model style price) pulled from the corresponding tokenUri which points to this stored information
+          -MUST require hornId > 0 because the hornsForSale[] array will NOT clear values and instead will reset indexed values to 0
       -allow for reports of glitches, bugs, fraudulent listings
     /horns See what horns people own! Here you'll find all the Horn NFTs in existence, mapped to their owners/players. What horn does your favorite horn player play?
     /FAQ What are NFTs? What is Ethereum? Who cares? Why Ethereum and not Solana or _insert_random_crypto_here?

@@ -96,7 +96,7 @@ contract HornMarketplace is Ownable, /*IERC721Receiver, */ERC721Enumerable {
     // @dev Restrict duplicate listings and allow only users who are minting their instrument as an NFT for the first time by checking hashes of concatenated make and serial number
     modifier nonDuplicateMint(string make, uint32 serialNumber) internal pure returns (bool) {
         //Hash concatenated _make and _serialNumber given by user
-        bytes memory hashOfMakeAndSerial = keccak256(abi.encodePacked(_make + _serialNumber)); // bytes32? bytes memory?
+        bytes memory hashOfMakeAndSerial = keccak256(abi.encodePacked(_make, _serialNumber)); // bytes32? bytes memory?
         //Loop through makeAndSerialHashes[] mapping in search for a matching hash, in which case given user input is a duplicate mint
         for (i = 0, i < horns[].length, i++) {
            require(makeAndSerialHashes[i] != hashOfMakeAndSerial);
@@ -143,9 +143,7 @@ contract HornMarketplace is Ownable, /*IERC721Receiver, */ERC721Enumerable {
         Marketplace Function implementations
     */
     // @notice List horn for sale by minting with metadata to fill Horn struct on-chain
-    // CHANGE THIS function to have an if clause that accommodates first time listing vs listing an existing NFT or create new function for existing horn nFTs? 
     // IF NEW FUNCTION, MAKE SURE ALL MAPPINGS/ATTRIBUTES ARE PROPERLY SET so escrow functions still work on correct addresses (ie line 191)
-    // ALSO CHANGE THIS FUNCTION to have an if clause that allows a minter to mint NFT without listing it for sale (for ownership historical record)
     function mintThenListNewHornNFT( 
       string calldata _make, 
       string calldata _model, 
@@ -161,7 +159,7 @@ contract HornMarketplace is Ownable, /*IERC721Receiver, */ERC721Enumerable {
         _hornId.increment();
         uint hornId = _hornId.current();
         _mint(msg.sender, hornId);
-        // _setTokenURI logic still needs to be implemented
+        // _setTokenURI(hornId, "https://netlify.com/largemediafiles/lfs")
           
         // @dev Store all horn metadata on-chain EXCEPT images which are stored externally via URI
         horns[hornId] = Horn({
@@ -183,7 +181,7 @@ contract HornMarketplace is Ownable, /*IERC721Receiver, */ERC721Enumerable {
         return hornId;
     }
 
-    // following function mints an NFT that is not intended to be listed for sale; owner only wants to establish verifiable immutable record of ownership
+    // @notice Following function mints an NFT that is not intended to be listed for sale; owner only wants to establish verifiable immutable record of ownership
     function mintButDontListNewHornNFT(
       string calldata _make,
       string calldata _model,
@@ -197,7 +195,7 @@ contract HornMarketplace is Ownable, /*IERC721Receiver, */ERC721Enumerable {
         _hornId.increment();
         uint hornId = _hornId.current();
         _mint(msg.sender, hornId);
-        // _setTokenURI logic still needs to be implemented
+        // _setTokenURI(hornId, "https://blabla.com/") logic still needs to be implemented
 
         // @dev Store all horn metadata on-chain EXCEPT images which are stored externally via URI
         horns[hornId] = Horn({
@@ -218,7 +216,7 @@ contract HornMarketplace is Ownable, /*IERC721Receiver, */ERC721Enumerable {
           return hornId;
         }
     
-    // following function must check that the hornNFT already exists!  and onlySeller(id) checks that it is owned by the caller of the function
+    // @notice Following function must check that the hornNFT already exists before listing
     function listExistingHornNFT(uint __hornId, uint32 _desiredPrice) 
       public 
       onlySeller(__hornId) {
@@ -228,7 +226,7 @@ contract HornMarketplace is Ownable, /*IERC721Receiver, */ERC721Enumerable {
 
         uint hornId = __hornId;
         hornsForSale.push(hornId);
-        // _setTokenURI may need to be updated if uploading new photos is desired
+        // _setTokenURI(hornId, "https://blabla.com");  // need image upload prompt on front end
 
         horns[hornId].listPrice = _desiredPrice;
         horns[hornId].status = HornStatus.ListedForSale;
@@ -260,8 +258,12 @@ contract HornMarketplace is Ownable, /*IERC721Receiver, */ERC721Enumerable {
         // @dev Set status to PaidFor so next function to be called must be markHornShipped by seller
         horns[__hornId].status = HornStatus.PaidFor;
         // @dev Delete hornId from hornsForSale uint[] array so it is no longer displayed
-        delete hornsForSale[__hornId];
-
+        for (i = 0, i < hornsForSale[].length, i++) {
+            if (hornsForSale[i] == __hornId); {
+                delete hornsForSale[i];
+            }
+        }
+        
         // @notice Emit event to notify seller via frontend that horn is paid for and must be shipped
         emit HornPurchased(__hornId, _shipTo, msg.sender);
         emit DepositedToEscrow(horns[__hornId].currentOwner, msg.value);
@@ -304,7 +306,7 @@ contract HornMarketplace is Ownable, /*IERC721Receiver, */ERC721Enumerable {
         currentOwners[__hornId] == msg.sender;
 
         // @dev Transfer horn NFT from seller(currentOwner) to msg.sender using safeTransferFrom from ERC721 interface (avoids NFTs locked in contracts)
-        safeTransferFrom(horns[__hornId].currentOwner, msg.sender, __hornId);
+        safeTransferFrom(previousOwner, msg.sender, __hornId); // if this doesn't work it's because address(this) of this smart contract is the one who was approved in previous function but this function lists the 'from' parameter as the owner. simply change to address(this)
 
         emit HornDeliveredAndNFTOwnershipTransferred(__hornId, previousOwner, msg.sender);
         emit SellerPaid(__hornId, previousOwner, msg.sender);
@@ -316,13 +318,10 @@ contract HornMarketplace is Ownable, /*IERC721Receiver, */ERC721Enumerable {
     /*
         Helper functions that provide (internal?) getter functionality
     */
-
+    // @dev Returns an array of hornId uints that are read by the front end to display Horns listed for sale
     function getCurrentHornsForSale() public view returns (uint[] memory) {
-        // loop through hornForSale[] uint array and display them to frontend to parse via hornId (could also do array of structs)
-        // for (i = 0, i < hornsForSale[].length, i++) {
-            // hornId = hornsForSale[i].id; // if I go this route i must add an id attribute to the horn structs- is there another way to view hornids of hornsforsale
-            // return horns[hornId];
-        //}
+        return hornsForSale[];
+        // return horns[hornId]; may want to return the struct for each hornForSale to make reading attributes faster?
     }
 
     function getListPriceByHornId(uint __hornId) public view returns (uint32) {
@@ -348,11 +347,12 @@ contract HornMarketplace is Ownable, /*IERC721Receiver, */ERC721Enumerable {
     // @dev Helper function that sets status of existing horn NFT to OwnedNotForSale, 
     // @notice Used in case minter only wants verifiable historical record or owner decides not to sell the instrument after listing or wishes to refund a buyer
     // @notice Must be set to internal after testing is done, only temporarily set to public for testing purposes
-    function initiateRefundOrSetStatusToOwnedNotForSale(uint __hornId) public /*internal*/ returns (HornStatus) {
+    function sellerInitiateRefundOrSetStatusToOwnedNotForSale(uint __hornId) public /*internal onlySeller()*/ returns (HornStatus) {
         if (horns[__hornId].status == HornStatus.ListedForSale) {
             horns[__hornId].status = HornStatus.OwnedNotForSale;
         } else if (horns[__hornId].status == HornStatus.PaidFor) {
-            //REFUND LOGIC HERE: escrow.refundToBuyer();
+            revert("Horn has already been purchased and paid for by a buyer and on-chain refunds are not currently supported"); // change this line once refund logic is implemented
+            //REFUND LOGIC HERE: escrow.refundToBuyer(); functino refundToBuyer() probably has a nested mapping of address => uint => enum == buyer => deposits => state.refundable / state.nonrefundable that gets updated when horn is markShipped
             // refund logic could probably include this next line within the refund function
             // horns[__hornId].status = HornStatus.OwnedNotForSale;
         } else if (horns[__hornId].status == HornStatus.Shipped) {
@@ -363,6 +363,8 @@ contract HornMarketplace is Ownable, /*IERC721Receiver, */ERC721Enumerable {
 
         return(HornStatus.OwnedNotForSale); // make sure this is correct syntax
     }
+
+    // function buyerInitiateRefund() does the buyer even need an option to get a refund once paid?
 
     fallback() public payable returns (bool) {
         revert("Please do not send this contract funds without any function call data or call a function that doesn't exist");
