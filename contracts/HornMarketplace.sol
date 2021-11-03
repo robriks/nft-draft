@@ -343,7 +343,6 @@ contract HornMarketplace is Ownable, /*IERC721Receiver, */ERC721Enumerable {
     // @dev Returns an array of hornId uints that are read by the front end to display Horns listed for sale
     function getCurrentHornsForSale() public view returns (uint[] memory) {
         return hornsForSale[];
-        // return horns[hornId]; may want to return the struct for each hornForSale to make reading attributes faster?
     }
 
     function getListPriceByHornId(uint __hornId) public view returns (uint32) {
