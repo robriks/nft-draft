@@ -11,14 +11,10 @@ contract TestHornMarketplace {
     // probably need to target escrow contract as well **apparently not
     // EscrowContract escrow = EscrowContract(DeployedAddresses.EscrowContract());
     
-    // @dev This serialNumberCounter gives a new serialNumber to mint fresh Horn NFTs for every subsequent test without any hash collisions from make and serialNumber via the nonDuplicateMint modifier
-    uint8 serialNumberCounter;
-
     /*
         Constructor
     */
-    constructor() payable { // prepares this contract with ETH funds on testnet for testing the marketplace contract
-        serialNumberCounter = 68;
+    constructor() payable { // prepares this contract with ETH funds on testnet for testing the marketplace contract    
     }
 
     /* 
@@ -43,25 +39,24 @@ contract TestHornMarketplace {
     }
     // @dev Test minting an instrument for the first time
     // @param Be sure to give the correct __hornId index of Horn struct in horns[] mapping or test will fail; finicky but other variables are private and don't to add attribute storage costs for a simple test
-    function testMintThenListNewHornNFT(uint __hornId) public {
+    function testMintThenListNewHornNFT() public {
         freshMarketplaceInstance();
 
-        uint returnedHornId = mintAndListFreshTestHorn(); // calls market.mintThenListNewHornNFT with preset parameters & incrementing serialNumber, returns hornId
-        uint expectedHornId = market._hornId.current();
+        uint returnedHornId = mintAndListFreshTestHorn(); // calls market.mintThenListNewHornNFT with preset parameters & incrementing serialNumber, returns currentHornId
+        uint expectedHornId = 1; // Expected currentHornId should be 1 after minting to a fresh contract instance
 
-        /* also need to check: 
-        *    nonDuplicateMint (will check if makeAndSerial are accurate) -- _mint a duplicate horn NFT to check against
-        *    hornId, outcome of _mint, _setTokenURI, makeAndModel
-        */
-        HornStatus expectedStatus = HornStatus.ListedForSale; // does it work? HornStatus enum should be inherited from the above import of Marketplace
+        // test hornId, 
+        // test outcome of _mint
+        // test _setTokenURI
+
         // @dev Checks status of the given index of struct mapping horns[__hornId]
-        // do nested tests like this work? 
-        // if not, consider removing assert() line from end of these helper functions and just have them return plain values and put assert() line here in this function, like so:
-        /*assert.equal(*/testGetStatusOfHornById(returnedHornId, expectedStatus)/*, 0, "HornStatus enum returned does not match expected ListedForSale value"*/; // also is this how to pass in an enum parameter? or is uint better
+        assert.isTrue(testGetStatusOfHornById(returnedHornId, HornStatus.ListedForSale), "HornStatus enum returned does not match expected ListedForSale value";
         // @dev Checks currentOwner in mapping vs struct attribute
         /*assert.equal(*/testGetCurrentOwnerMappingAgainstStructAttributeByHornId(returnedHornId)/*,  */;
 
-        assert.equal(returnedHornId, expectedHornId, "HornId returned by mintAndListFreshTestHorn does not match the expectedHornId given by the Marketplace's Counter.Counter");
+        assert.equal(returnedHornId, expectedHornId, "returnedHornId given by mintAndListFreshTestHorn's Counter.Counter does not match the expectedHornId of 1 for a fresh contract instance's first mint");
+        // check that listprice was updated
+        assert.isTrue(testGetListPriceByHornId(returnedHornId));
     }
 
     // @dev Test minting an instrument for the first time but NOT listing it for sale
@@ -79,6 +74,7 @@ contract TestHornMarketplace {
         uint hornId = market._hornId.current();
         market.listExistingHornNFT(hornId, 4200000000000000000);
 
+        // Check that listPrice was updated
         // assert.    dkkddkdk
     }
 
@@ -286,7 +282,7 @@ contract TestHornMarketplace {
             "Berg",
             "Double",
             "Geyer",
-            serialNumberCounter,
+            serialNumberCounter, //FIX THIS LINE
             4200000000000000000
         );
 
@@ -298,7 +294,7 @@ contract TestHornMarketplace {
     function testSellerInitiateRefundOrSetStatusToOwnedNotForSale() public {
        // set conditions to identify an NFT that is ListedForSale
        freshMarketplaceInstance();
-       mintAndListFreshHornNFT(); // {from: seller}
+       mintAndListFreshHorn(); // {from: seller}
 
        uint hornId = market._hornId.current();
        HornStatus returnedStatus = market.sellerInitiateRefundOrSetStatusToOwnedNotForSale(hornId);
@@ -315,7 +311,7 @@ contract TestHornMarketplace {
             "Berg",
             "Double",
             "Geyer", 
-            serialNumberCounter,
+            serialNumberCounter, //FIX THIS LINE HERE
             4200000000000000000
         );
 
@@ -366,7 +362,7 @@ contract TestHornMarketplace {
             "Berg",
             "Double",
             "Geyer", 
-            serialNumberCounter,
+            serialNumberCounter, //FIX THIS LINE HERE
             4200000000000000000
         );
         mintAndListFreshHorn(); // Id should == 4
@@ -387,7 +383,7 @@ contract TestHornMarketplace {
             "Berg",
             "Double",
             "Geyer", 
-            serialNumberCounter,
+            serialNumberCounter, //FIX THISLINE
             4200000000000000000
         );
         // @dev Purchases the listed firstTestHornId and thereby 'deletes' it from the hornsForSale[] uint[] array by resetting its value to 0
@@ -406,11 +402,12 @@ contract TestHornMarketplace {
     // @dev Test price getter function of listPrice attribute inside horn struct of given HornId
     // @notice This function is used as a helper at different stages of the transaction to track intended behavior
     function testGetListPriceByHornId(uint __hornId) public returns (bool) {
-        uint expectedPrice = horns[__hornId].listPrice;
-        uint returnedPrice = market.testGetListPriceByHornId(__hornId);
-        // if this doesnt work as a nested test, just remove assert.equal and use a require() statement so this function returns (bool) which is easy to work with in the larger host functions
+        require(market.horns[__hornId].listPrice > 0, "Horn NFT listPrice appears to be 0, check mint execution");
+        uint expectedPrice = market.horns[__hornId].listPrice;
+        uint returnedPrice = market.getListPriceByHornId(__hornId);
 
-        assert.equal(expectedPrice == returnedPrice, "Expected listPrice attribute of horn NFT struct does not match the one given by marketplace getter function");
+        require(expectedPrice == returnedPrice, "Expected listPrice attribute of horn NFT struct does not match the one given by marketplace getter function");
+        return true;
     }
 
     // @dev Test current owner getter function by getting returned address of given hornId
@@ -469,29 +466,70 @@ contract TestHornMarketplace {
     function freshMarketplaceInstance() public {
         market = new HornMarketplace();
     }
-    // @dev Mints a fresh Horn NFT for testing purposes
+    // // @dev Mints a fresh Horn NFT for testing purposes
+    // // @param serialNumberCounter is incremented every time this function is called so that the nonDuplicateMint modifier hashes make and serial data without collision
+    // function mintAndListFreshTestHorn() public returns (uint) {
+    //     serialNumberCounter++;
+
+    //     // seller.mintAndList(); {market.mintThenListNewHornNFT}
+    //     market.mintThenListNewHornNFT( // make a seller address who calls this function {from:}
+    //         "Berg",
+    //         "Double",
+    //         "Geyer", 
+    //         serialNumberCounter,
+    //         4200000000000000000
+    //     );
+    //     uint currentHornId = market._hornId.current();
+
+    //     return currentHornId;
+    // }
+    // // @dev Prepares a given Horn NFT for markShipped testing
+    // // @param This function is payable and must be given a msg.value to carry out the market.purchaseHornByHornId line
+    // function prepareForShipped(uint hornId) public payable returns (string) {
+    //     string memory testShipTo = "21 Mil St. BTCidatel, Metaverse 69696";
+
+    //     market.purchaseHornByHornId(hornId, testShipTo); // make a buyer address who calls this function {value: 420??} {from: ??}
+
+    //     return testShipTo;
+    // }
+//     // @dev Prepares a given Horn NFT for markHornDelivered and transfer testing
+//     function prepareForTransfer(uint hornId) public returns (string) {
+//         string memory testShipTo = "21 Mil St. BTCidatel, Metaverse 69696";
+        
+//         market.markHornShipped(hornId, testShipTo); // use seller address who was created in mint function {from:}
+
+//         return testShipTo;
+//     }
+}
+
+
+
+// MAKE SURE THAT SERIALNUMBERCOUNTER AND HORNIDS ARE PROPERLY PRESERVED AND PASSED BETWEEN CONTRACTS
+contract seller {
+
+    // @dev This serialNumberCounter gives a new serialNumber to mint fresh Horn NFTs for every subsequent test without any hash collisions from make and serialNumber via the nonDuplicateMint modifier
+    uint serialNumberCounter;
+
+    constructor() {
+        serialNumberCounter = 0;
+    }
+    // @dev Mints a fresh Horn NFT from the seller contract for testing purposes
     // @param serialNumberCounter is incremented every time this function is called so that the nonDuplicateMint modifier hashes make and serial data without collision
     function mintAndListFreshTestHorn() public returns (uint) {
         serialNumberCounter++;
-        market.mintThenListNewHornNFT( // make a seller address who calls this function {from:}
+
+        market.mintThenListNewHornNFT(
             "Berg",
             "Double",
             "Geyer", 
             serialNumberCounter,
             4200000000000000000
         );
+        uint currentHornId = market._hornId.current();
 
-        return serialNumberCounter;
+        return currentHornId;
     }
-    // @dev Prepares a given Horn NFT for markShipped testing
-    // @param This function is payable and must be given a msg.value to carry out the market.purchaseHornByHornId line
-    function prepareForShipped(uint hornId) public payable returns (string) {
-        string memory testShipTo = "21 Mil St. BTCidatel, Metaverse 69696";
 
-        market.purchaseHornByHornId(hornId, testShipTo); // make a buyer address who calls this function {value: 420??} {from: ??}
-
-        return testShipTo;
-    }
     // @dev Prepares a given Horn NFT for markHornDelivered and transfer testing
     function prepareForTransfer(uint hornId) public returns (string) {
         string memory testShipTo = "21 Mil St. BTCidatel, Metaverse 69696";
@@ -500,3 +538,18 @@ contract TestHornMarketplace {
 
         return testShipTo;
     }
+}
+
+
+contract buyer {
+
+    // @dev Prepares a given Horn NFT for markShipped testing
+    // @param This function is payable and must be given a msg.value to carry out the market.purchaseHornByHornId line
+    function prepareForShipped(uint hornId) public payable returns (string) {
+        string memory testShipTo = "21 Mil St. BTCidatel, Metaverse 69696";
+
+        market.purchaseHornByHornId(hornId, testShipTo); // {value:} ?
+
+        return testShipTo;
+    }
+}
