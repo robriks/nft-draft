@@ -208,7 +208,7 @@ contract HornMarketplace is Ownable, /*IERC721Receiver, */ERC721Enumerable {
             currentOwner: payable(msg.sender)
         });
 
-          // @dev update mappings to reflect new mint
+          // @dev Update mappings to reflect new mint
           currentOwners[hornId] = msg.sender;
 
           emit NewHornNFTMinted(hornId, msg.sender, _make);

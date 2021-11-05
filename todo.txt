@@ -52,6 +52,7 @@ Test Contract:
   use web3 {value: 420} ?
 -consider moving Seller and Buyer contract into separate files
 -check how Enum values are passed into test values as a parameter. Consider wrapping in uint(HornStatus.forSale) or using forSale instead of HornStatus.forSale. or maybe just plain uints 0, 1, 2?
+-write tests for tokenURI logic
 
 
 Escrow + Marketplace interfacing:
