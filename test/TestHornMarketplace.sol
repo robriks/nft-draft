@@ -27,6 +27,7 @@ contract TestHornMarketplace {
     /* 
     *  Main Function Tests
     */
+    // @notice Testing for event emission is specifically NOT supported by solidity smart contracts so those tests must be done in javascript
     // @dev Sanity checks for horn owner of escrow and marketplace contracts
     function testOwnerOfHornMarketplaceContract() public {
         freshMarketplaceAndSellerBuyerInstance();
@@ -39,7 +40,7 @@ contract TestHornMarketplace {
     function testOwnerOfEscrow() public {
         freshMarketplaceAndSellerBuyerInstance();
 
-        address /*payable*/ returnedOwnerOfEscrow = market.escrow.owner(); // this is ownable inherited function, may not work
+        address /*payable*/ returnedOwnerOfEscrow = market.escrow.owner(); // this is ownable inherited function, may need to import ownable
         address /*payable*/ correctOwnerOfEscrow = DeployedAddresses.HornMarketplace();
 
         assert.equal(returnedOwnerOfEscrow, correctOwnerOfEscrow, "Owner of instantiated escrow contract does not match HornMarketplace contract address");
@@ -85,40 +86,59 @@ contract TestHornMarketplace {
         // assert.    dkkddkdk
     }
 
-    // @dev Test buying an instrument
+    // @dev Test buying an instrument with this contract
+    // @param Since only one horn was minted, hornId is used here for an extra purpose: as the index within hornsForSale[] array that is deleted upon execution of purchase. This would not work for testing multiple mints
     function testHornPurchase() public payable {
+        // Set conditions to prepare for purchaseHornByHornId()
         freshMarketplaceAndSellerBuyerInstance();
         seller.mintAndListFreshTestHorn();
 
         uint hornId = market._hornId.current();
-        market.purchaseHornByHornId(hornId, "Ju St. Testing, Purchase Attempt New York, 11111");
+        string memory testAddress = "Ju St. Testing, Purchase Attempt New York, 11111";
+        // THIS LINE USES THIS CONTRACT TO BUY, seems reasonable unless it breaks testing
+        market.purchaseHornByHornId(hornId, testAddress); // {value:}
 
-        // assert.    dkdk
-    } // should result in funds deposited to escrow
+        // @param Seller contract referenced because depositsOf refers to the payee, in this case the seller
+        uint returnedDeposits = escrow.depositsOf(DeployedAddresses.Seller());
+        uint hornListPrice = market.horns[hornId].listPrice;
+        string memory returnedShippingAddress = market.shippingAddresses[address(this)];
+        address returnedBuyerAddress = market.buyers[hornId];
+        uint shouldHaveBeenDeleted = market.hornsForSale[hornId];
+
+        // Check that escrow deposit was executed properly
+        assert.equal(returnedDeposits, hornListPrice, "Amount of deposited funds to escrow contract does not match the listPrice attribute of the horn NFT, check escrow deposit execution");
+        // Check that shippingAddresses mapping was updated with 2nd parameter
+        assert.equal(returnedShippingAddress, testAddress, "Shipping address returned by shippingAddresses[] mapping does not match the test address provided to purchaseHornByHornId function");
+        // Check that buyers mapping was updated to msg.sender, in this case address(this)
+        assert.equal(returnedBuyerAddress, address(this), "Address returned by market buyers[] mapping does not match the one that purchased the instrument, in this case this contract");
+        // Check that status was updated to PaidFor
+        assert.equal(testGetStatusOfHornById(hornId, HornStatus.PaidFor), "HornStatus was not successfully updated to PaidFor, check execution of purchaseHornByHornId()");
+        // Check that hornId was deleted from hornsForSale[] uint[] array
+        assert.isZero(shouldHaveBeenDeleted, "Value returned by hornsForSale[] uint[] array was not 0, meaning it was not properly deleted upon execution of purchase");
+        // javascript tests for event emissions
+    }
 
     // @dev Ensure only Sellers can mark horn shipped
-    // @notice Testing for event emission is specifically NOT supported by solidity smart contracts so those tests must be done in javascript!!!
-
-    function testMarkAsShipped() public {
+    function testMarkHornShipped() public {
         freshMarketplaceAndSellerBuyerInstance();
         seller.mintAndListFreshTestHorn();
 
         uint hornId = market._hornId.current();
         buyer.prepareForShipped(hornId); // {value: }
-        seller.prepareForTransfer(hornId));
+        seller.prepareForTransfer(hornId);
         
         // Check that approval for __hornId given to marketplace contract was carried out
-        address returnedApprovedAddressForHornId = getApproved(hornId);
-        // address expectedApprovedAddressForHornId = buyer; // buyer construct not yet implemented
+        address returnedApprovedAddressForHornId = getApproved(hornId); // import ERC721?
+        address expectedApprovedAddressForHornId = DeployedAddresses.Buyer();
         
-        // assert.Equal(returnedApprovedAddressForHornId, expectedApprovedAddressForHornId, "Returned approved address for tokenId doesn't match expected address, check execution of Approve()");
+        assert.Equal(returnedApprovedAddressForHornId, expectedApprovedAddressForHornId, "Returned approved address for tokenId doesn't match expected address, check execution of Approve()");
 
         // Use helper function to check that status was updated to Shipped
-        assert.isTrue(testGetStatusOfHornById(hornId, HornStatus.Shipped, "HornStatus was not successfully updated to Shipped, check execution of markHornShipped"));
+        assert.isTrue(testGetStatusOfHornById(hornId, HornStatus.Shipped), "HornStatus was not successfully updated to Shipped, check execution of markHornShipped()");
     } // javascript version should expect hornShipped event emission with correct address
 
     // @dev Attempts to mark shipped with a wrong address
-    function testMarkAsShippedWithWrongAddress() public {
+    function testMarkHornShippedWithWrongAddress() public {
         // First sets conditions of exchange up to point where markHornShipped would be called
         freshMarketplaceAndSellerBuyerInstance();
         seller.mintAndListFreshTestHorn();
@@ -144,26 +164,26 @@ contract TestHornMarketplace {
         seller.mintAndListFreshTestHorn();
 
         uint hornId = market._hornId.current();
-        buyer.prepareForShipped(hornId); // {value: } 
+        buyer.prepareForShipped(hornId); // {value: listPrice} 
 
-        market.markHornDeliveredAndOwnershipTransferred(hornId); // {from: buyer}
+        uint returnedPaymentAmt = buyer.deliveredAndTransfer(hornId);
 
-        // Check that currentOwner was correctly updated to buyer
         address payable currentOwnerViaMapping = market.getCurrentOwnerByMapping(hornId);
-        //assert.equal(currentOwnerViaMapping, payable(address(this)), "CurrentOwner of Horn NFT as returned by storage mapping does not match expected address"); // probably dont use address(this) and instead user buyer address
         
         address returnedBuyerOfHornId = market.buyers[hornId];
         address expectedBuyerOfHornIdShouldBe0 = address(0); // can address(0) be payable?
 
-        // string memory returnedShippingAddressesString = market.shippingAddresses[buyer]; // buyer construct not yet implemented
+        string memory returnedShippingAddressesString = market.shippingAddresses[buyer];
         string memory expectedShippingAddressesStringShouldBeEmpty = "";
 
-        // uint escrowBalanceOfSeller = escrow.depositsOf(seller); // seller construct not yet implemented
-
-        // uint tokenIdTransferredToBuyer = balanceOf(buyer); // buyer construct not yet implemented // import ierc721?
+        
+        uint escrowBalanceOfSeller = escrow.depositsOf(DeployedAddresses.Seller());
+        //@notice ERC721 balanceOf() method actually returns a uint[] array, so in case of multiple NFTs the following line would need to be reworked to loop through the returned array
+        uint tokenIdTransferredToBuyer = balanceOf(buyer); // need to import ierc721?
 
         // Check escrow.withdraw(horns[__hornId].currentOwner) was properly sent to the seller
-        //assert.isZero(escrowBalanceOfSeller, "Escrow contract was not properly drained of funds intended for seller"); //expects depositsOf() the payee, or seller, to have been drained
+        assert.equal(returnedPaymentAmt, hornListPrice, "Payment amount returned by markHornDeliveredAndOwnershipTransferred() does not match Horn NFT listPrice attribute");
+        assert.isZero(escrowBalanceOfSeller, "Escrow contract was not properly drained of funds intended for seller"); //expects depositsOf() the payee aka seller to have been drained
         
         // Check that buyers[hornId] was set to address(0)
         assert.equal(returnedBuyerOfHornId, expectedBuyerOfHornIdShouldBe0, "Address returned by buyers[hornId] was not successfully zeroed out");
@@ -172,6 +192,8 @@ contract TestHornMarketplace {
 
         // Check that HornStatus status of hornNFT was correctly updated to OwnedNotForSale (== 3)
         assert.isTrue(testGetStatusOfHornById(hornId, HornStatus.OwnedNotForSale));
+        // Check that currentOwner was correctly updated to buyer
+        assert.equal(currentOwnerViaMapping, payable(DeployedAddresses.Buyer()), "CurrentOwner of Horn NFT as returned by storage mapping does not match expected address");
         // Check that currentOwner is consistent in both the mapping and the struct attribute
         assert.isTrue(testGetCurrentOwnerMappingAgainstStructAttributeByHornId(hornId));
 
@@ -233,7 +255,7 @@ contract TestHornMarketplace {
         assert.isFalse(paidTooMuch, "A generous soul got ripped off and was able to purchase a horn with msg.value that didn't match listPrice");
     }
     // @dev Attempts to call purchaseHornById on a horn that is not currently listed for sale
-    * function testForSale() public {
+    function testForSale() public {
         freshMarketplaceAndSellerBuyerInstance();
         seller.mintAndListFreshTestHorn();
         // market.mintButDontListNewHornNFT( // ONLY IF INITIATEREFUND FUNCTION HAVING ISSUES
@@ -443,7 +465,7 @@ contract TestHornMarketplace {
             expectedEnum = 3;
         }
         uint returnedEnum = uint(market.getStatusOfHornByHornId(__hornId));
-        // if this doesnt work as a nested test, just use a require() statement so this function returns (bool) which is easy to work with in the larger host functions
+
         require(returnedEnum == expectedEnum, "HornStatus enum uint returned by marketplace contract does not match the expected one given");
         return true;
     } 
@@ -526,5 +548,11 @@ contract Buyer {
         market.purchaseHornByHornId(hornId, testShipTo); // {value:} ?
 
         return testShipTo;
+    }
+
+    function deliveredAndTransfer(uint hornId) public returns (uint) {
+        uint paymentAmt = market.markHornDeliveredAndOwnershipTransferred(hornId);
+
+        return paymentAmt
     }
 }
