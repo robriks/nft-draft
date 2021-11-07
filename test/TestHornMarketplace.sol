@@ -53,18 +53,19 @@ contract TestHornMarketplace {
         // Mints a fresh Horn NFT with defaultListPrice, increments serialNumber, returns currentHornId
         uint returnedHornId = seller.mintAndListFreshTestHorn();
         uint expectedHornId = 1; // Expected currentHornId should be 1 after minting to a fresh contract instance
+        uint returnedBalanceHornId = balanceOf(sellerAddress);
         uint returnedListPrice = market.getListPriceByHornId(hornId);
         uint addedToForSaleArray = hornsForSale[0];
+        // tokenURI variables here
         address payable returnedCurrentOwner = horns[returnedHornId].currentOwner;
         address payable expectedCurrentOwner = sellerAddress;
-
-        // test _minted hornId, assert.equal(balanceOf(DeployedAddresses.Seller()), 1, "");
-        // test _setTokenURI
 
         // Check that a fresh hornId was created
         assert.equal(returnedHornId, expectedHornId, "returnedHornId given by mintAndListFreshTestHorn's Counter.Counter does not match the expectedHornId of 1 for a fresh contract instance's first mint");
         // Check that Horn NFT was _minted properly to the seller address
-        assert.equal(balanceOf(sellerAddress), expectedHornId, "Balance of sellerAddress as returned by ERC721 method does not match the expected Horn NFT tokenId of 1");
+        assert.equal(returnedBalanceHornId, expectedHornId, "Balance of sellerAddress as returned by ERC721 method does not match the expected Horn NFT tokenId of 1");
+        // test _setTokenURI
+        // assert.tokenURI
         // Check that make was properly set
         assert.equal(returnedMake, "Berg");
         // Check that model was properly set
@@ -98,7 +99,9 @@ contract TestHornMarketplace {
         );
         uint hornId = market._hornId.current();
         uint expectedHornId = 1; //Expected currentHornId should be 1 after minting to a fresh contract instance
+
         // tokenURI variables here
+
         string memory returnedMake = market.horns[hornId].make;
         string memory returnedModel = market.horns[hornId].model;
         string memory returnedStyle = market.horns[hornId].style;
