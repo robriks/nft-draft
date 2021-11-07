@@ -46,26 +46,43 @@ contract TestHornMarketplace {
         assert.equal(returnedOwnerOfEscrow, correctOwnerOfEscrow, "Owner of instantiated escrow contract does not match HornMarketplace contract address");
     }
     // @dev Test minting an instrument for the first time
-    // @param Be sure to give the correct __hornId index of Horn struct in horns[] mapping or test will fail; finicky but other variables are private and don't to add attribute storage costs for a simple test
+    // @param Be sure to give the correct __hornId index of Horn struct in horns[] mapping or test will fail; finicky but other variables are private and don't want to add attribute storage costs for a simple test
     function testMintThenListNewHornNFT() public {
         freshMarketplaceAndSellerBuyerInstance();
-        
+        address payable sellerAddress = DeployedAddresses.Seller();
         // Mints a fresh Horn NFT with defaultListPrice, increments serialNumber, returns currentHornId
         uint returnedHornId = seller.mintAndListFreshTestHorn();
         uint expectedHornId = 1; // Expected currentHornId should be 1 after minting to a fresh contract instance
         uint returnedListPrice = market.getListPriceByHornId(hornId);
+        uint addedToForSaleArray = hornsForSale[0];
+        address payable returnedCurrentOwner = horns[returnedHornId].currentOwner;
+        address payable expectedCurrentOwner = sellerAddress;
 
         // test _minted hornId, assert.equal(balanceOf(DeployedAddresses.Seller()), 1, "");
         // test _setTokenURI
 
         // Check that a fresh hornId was created
         assert.equal(returnedHornId, expectedHornId, "returnedHornId given by mintAndListFreshTestHorn's Counter.Counter does not match the expectedHornId of 1 for a fresh contract instance's first mint");
+        // Check that Horn NFT was _minted properly to the seller address
+        assert.equal(balanceOf(sellerAddress), expectedHornId, "Balance of sellerAddress as returned by ERC721 method does not match the expected Horn NFT tokenId of 1");
+        // Check that make was properly set
+        assert.equal(returnedMake, "Berg");
+        // Check that model was properly set
+        assert.equal(returnedModel, "Double");
+        // Check that style was properly set
+        assert.equal(returnedStyle, "Geyer");
+        // Check that serialNumber was properly set
+        assert.equal(returnedSerialNumber, defaultSerialNumber);
         // Check status of the given index of struct mapping horns[__hornId]
         assert.isTrue(testGetStatusOfHornById(returnedHornId, HornStatus.ListedForSale), "HornStatus enum returned does not match expected ListedForSale value";
+        // Check that currentOwner of NFT was set to minter, in this case the seller address
+        assert.equal(returnedCurrentOwner, expectedCurrentOwner, "Horn NFT was minted to a different address than the seller address, check execution of mint and the currentOwner attribute");
         // Check currentOwner in mapping vs struct attribute
-        /*assert.equal(*/testGetCurrentOwnerMappingAgainstStructAttributeByHornId(returnedHornId)/*,  */;
+        assert.isTrue(testGetCurrentOwnerMappingAgainstStructAttributeByHornId(returnedHornId), "Current Owner returned by mapping does not match the one returned by the Horn NFT attribute");
         // Check that listPrice was updated
         assert.equal(returnedListPrice, defaultListPrice);
+        // Check that hornsForSale[] uint[] array was updated to include returnedHornId
+        assert.equal(addedToForSaleArray, returnedHornId, "NFT hornId returned by hornsForSale[] uint[] array does not match the hornId that should have been pushed. Check index and execution of listExistingHornNFT()");
     }
 
     // @dev Test minting an instrument for the first time but NOT listing it for sale
@@ -148,7 +165,7 @@ contract TestHornMarketplace {
 
         uint hornId = market._hornId.current();
         string memory testAddress = "Ju St. Testing, Purchase Attempt New York, 11111";
-        // THIS LINE USES THIS CONTRACT TO BUY, seems reasonable unless it breaks testing
+        // This line uses this contract to buy, to provide some variety in testing
         market.purchaseHornByHornId(hornId, testAddress); // {value:}
 
         // @param Seller contract referenced because depositsOf refers to the payee, in this case the seller
