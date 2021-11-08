@@ -53,11 +53,18 @@ contract TestHornMarketplace {
         // Mints a fresh Horn NFT with defaultListPrice, increments serialNumber, returns currentHornId
         uint returnedHornId = seller.mintAndListFreshTestHorn();
         uint expectedHornId = 1; // Expected currentHornId should be 1 after minting to a fresh contract instance
-        uint returnedBalanceHornId = balanceOf(sellerAddress);
-        uint returnedListPrice = market.getListPriceByHornId(hornId);
-        uint addedToForSaleArray = hornsForSale[0];
+        uint returnedBalanceHornId = balanceOf(sellerAddress); // IMPORT ERC721
+        uint returnedListPrice = market.getListPriceByHornId(returnedHornId);
+        uint addedToForSaleArray = market.hornsForSale[0];
+        uint returnedSerialNumber = market.horns[hornId].serialNumber;
+        string memory returnedMake = market.horns[hornId].make;
+        string memory expectedMake = "Berg";
+        string memory returnedModel = market.horns[hornId].model;
+        string memory expectedModel = "Double";
+        string memory returnedStyle = market.horns[hornId].style;
+        string memory expectedStyle = "Geyer";
         // tokenURI variables here
-        address payable returnedCurrentOwner = horns[returnedHornId].currentOwner;
+        address payable returnedCurrentOwner = market.horns[returnedHornId].currentOwner;
         address payable expectedCurrentOwner = sellerAddress;
 
         // Check that a fresh hornId was created
@@ -67,15 +74,15 @@ contract TestHornMarketplace {
         // test _setTokenURI
         // assert.tokenURI
         // Check that make was properly set
-        assert.equal(returnedMake, "Berg");
+        assert.equal(returnedMake, expectedMake);
         // Check that model was properly set
-        assert.equal(returnedModel, "Double");
+        assert.equal(returnedModel, expectedModel);
         // Check that style was properly set
-        assert.equal(returnedStyle, "Geyer");
+        assert.equal(returnedStyle, expectedStyle);
         // Check that serialNumber was properly set
         assert.equal(returnedSerialNumber, defaultSerialNumber);
         // Check status of the given index of struct mapping horns[__hornId]
-        assert.isTrue(testGetStatusOfHornById(returnedHornId, HornStatus.ListedForSale), "HornStatus enum returned does not match expected ListedForSale value");
+        assert.isTrue(testGetStatusOfHornById(returnedHornId, 0), "HornStatus enum returned does not match expected ListedForSale value");
         // Check that currentOwner of NFT was set to minter, in this case the seller address
         assert.equal(returnedCurrentOwner, expectedCurrentOwner, "Horn NFT was minted to a different address than the seller address, check execution of mint and the currentOwner attribute");
         // Check currentOwner in mapping vs struct attribute
@@ -527,19 +534,9 @@ contract TestHornMarketplace {
 
     // @dev Test current enum status getter function via given hornId
     // @notice This function is used as a helper at different stages of the transaction to track intended behavior
-    function testGetStatusOfHornById(uint __hornId, HornStatus _expectedStatus) public returns (bool) {
+    function testGetStatusOfHornById(uint __hornId, uint _expectedHornStatus) public returns (bool) {
         // convert given expected HornStatus enum to a uint for comparison to market's function returnedEnum
-        uint expectedEnum;
-
-        if (uint(expectedStatus) == 0) {
-            expectedEnum = 0; 
-        } else if (uint(expectedStatus) == 1) {
-            expectedEnum = 1;
-        } else if (uint(expectedStatus) == 2) {
-            expectedEnum = 2;
-        } else if (uint(expectedStatus) == 3) {
-            expectedEnum = 3;
-        }
+        uint expectedEnum = _expectedHornStatus; // 0 = ListedForSale, 1 = PaidFor, 2 = Shipped, 3 = OwnedNotForSale
         uint returnedEnum = uint(market.getStatusOfHornByHornId(__hornId));
 
         require(returnedEnum == expectedEnum, "HornStatus enum uint returned by marketplace contract does not match the expected one given");
