@@ -66,7 +66,7 @@ contract HornMarketplace is Ownable, /*IERC721Receiver, */ERC721Enumerable {
     // @notice horns mapping keeps track of all horn NFT owners & histories via _hornId (s/o to OpenZep Counter.counter library)
     mapping (uint => Horn) horns;
     // @dev Add hash of horn NFT make and serialNumber using Counter.counter to compare all existing hashes to new mints to prevent duplicate NFTs of the same instrument
-    mapping (uint => bytes memory) makeAndSerialHashes; // bytes32? bytes memorY?
+    mapping (uint => bytes32) makeAndSerialHashes; // bytes32? bytes memorY?
     // @dev currentOwners and buyers mappings used for function access control
     // @dev Add address to buyers when horn is paid for via escrow, address to currentOwners when sale and exchange is complete
     mapping (uint => address) currentOwners;
@@ -94,11 +94,11 @@ contract HornMarketplace is Ownable, /*IERC721Receiver, */ERC721Enumerable {
     // }
 
     // @dev Restrict duplicate listings and allow only users who are minting their instrument as an NFT for the first time by checking hashes of concatenated make and serial number
-    modifier nonDuplicateMint(string make, uint32 serialNumber) internal pure returns (bool) {
+    modifier nonDuplicateMint(string calldata _make, uint32 _serialNumber) {
         //Hash concatenated _make and _serialNumber given by user
-        bytes memory hashOfMakeAndSerial = keccak256(abi.encodePacked(_make, _serialNumber)); // bytes32? bytes memory?
+        bytes32 hashOfMakeAndSerial = keccak256(abi.encodePacked(_make, _serialNumber)); // bytes32? bytes memory?
         //Loop through makeAndSerialHashes[] mapping in search for a matching hash, in which case given user input is a duplicate mint
-        for (i = 0, i < horns[].length, i++) {
+        for (uint i = 0; i < _hornId.current(); i++) {
            require(makeAndSerialHashes[i] != hashOfMakeAndSerial);
         }
         _;
@@ -186,10 +186,9 @@ contract HornMarketplace is Ownable, /*IERC721Receiver, */ERC721Enumerable {
       string calldata _make,
       string calldata _model,
       string calldata _style,
-      uint32 _serialNumber,
-      uint32 _desiredPrice) 
+      uint32 _serialNumber) 
       external
-      nonDuplicateMint(_hornId.current(), _make, _serialNumber) 
+      nonDuplicateMint(_make, _serialNumber) 
       returns (uint) {
         // @dev Increment counter _hornId then store publicly accessible hornId using current counter
         _hornId.increment();
@@ -219,7 +218,8 @@ contract HornMarketplace is Ownable, /*IERC721Receiver, */ERC721Enumerable {
     // @notice Following function must check that the hornNFT already exists before listing
     function listExistingHornNFT(uint __hornId, uint32 _desiredPrice) 
       public 
-      onlySeller(__hornId) {
+      onlySeller(__hornId) 
+      returns (uint) {
         require(_exists(__hornId), "That Horn NFT tokenId doesn't exist");
         require(_desiredPrice > 0, "Your Horn is valuable and cannot be sold for free!");
         require(horns[__hornId].status != HornStatus.ListedForSale, "Your Horn is already listed for sale");
@@ -258,8 +258,8 @@ contract HornMarketplace is Ownable, /*IERC721Receiver, */ERC721Enumerable {
         // @dev Set status to PaidFor so next function to be called must be markHornShipped by seller
         horns[__hornId].status = HornStatus.PaidFor;
         // @dev Delete hornId from hornsForSale uint[] array so it is no longer displayed
-        for (i = 0, i < hornsForSale[].length, i++) {
-            if (hornsForSale[i] == __hornId); {
+        for (uint i = 0; i < hornsForSale.length; i++) {
+            if (hornsForSale[i] == __hornId) {
                 delete hornsForSale[i];
             }
         }
@@ -342,7 +342,7 @@ contract HornMarketplace is Ownable, /*IERC721Receiver, */ERC721Enumerable {
     */
     // @dev Returns an array of hornId uints that are read by the front end to display Horns listed for sale
     function getCurrentHornsForSale() public view returns (uint[] memory) {
-        return hornsForSale[];
+        return hornsForSale;
     }
 
     function getListPriceByHornId(uint __hornId) public view returns (uint32) {
@@ -350,7 +350,7 @@ contract HornMarketplace is Ownable, /*IERC721Receiver, */ERC721Enumerable {
     }
 
     function getCurrentOwnerByMapping(uint __hornId) public view returns (address payable) {
-        return currentOwners[__hornId];
+        return payable(currentOwners[__hornId]);
     }
 
     function getCurrentOwnerByStructAttribute(uint __hornId) public view returns (address payable) {
@@ -362,12 +362,12 @@ contract HornMarketplace is Ownable, /*IERC721Receiver, */ERC721Enumerable {
     }
 
     function getEscrowDepositValue(address payee) public view returns (uint) {
-        escrow.depositsOf(payee);
+        uint escrowBalance = escrow.depositsOf(payee);
+        return escrowBalance;
     }
 
-    fallback() public payable returns (bool) {
+    fallback() external payable {
         revert("Please do not send this contract funds without any function call data or call a function that doesn't exist");
-        return false;
     }
 
     // in future, can add filter functions as well to display only doubles or only Lukas, etc

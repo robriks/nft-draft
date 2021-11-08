@@ -75,7 +75,7 @@ contract TestHornMarketplace {
         // Check that serialNumber was properly set
         assert.equal(returnedSerialNumber, defaultSerialNumber);
         // Check status of the given index of struct mapping horns[__hornId]
-        assert.isTrue(testGetStatusOfHornById(returnedHornId, HornStatus.ListedForSale), "HornStatus enum returned does not match expected ListedForSale value";
+        assert.isTrue(testGetStatusOfHornById(returnedHornId, HornStatus.ListedForSale), "HornStatus enum returned does not match expected ListedForSale value");
         // Check that currentOwner of NFT was set to minter, in this case the seller address
         assert.equal(returnedCurrentOwner, expectedCurrentOwner, "Horn NFT was minted to a different address than the seller address, check execution of mint and the currentOwner attribute");
         // Check currentOwner in mapping vs struct attribute
@@ -103,23 +103,26 @@ contract TestHornMarketplace {
         // tokenURI variables here
 
         string memory returnedMake = market.horns[hornId].make;
+        string memory expectedMake = "Berg";
         string memory returnedModel = market.horns[hornId].model;
+        string memory expectedModel = "Double";
         string memory returnedStyle = market.horns[hornId].style;
+        string memory expectedStyle = "Geyer";
         uint returnedSerialNumber = market.horns[hornId].serialNumber;
         uint returnedListPrice = market.getListPriceByHornId(hornId);
         address payable returnedCurrentOwner = market.horns[hornId].currentOwner;
         address payable expectedCurrentOwner = payable(address(this));
 
         // Check that a fresh hornId was created
-        assert.equal(returnedHornId, expectedHornId, "returnedHornId given by market contract does not match expectedHornId of 1 for a fresh contract instance's first mint")
+        assert.equal(returnedHornId, expectedHornId, "returnedHornId given by market contract does not match expectedHornId of 1 for a fresh contract instance's first mint");
         // Check that tokenURI was properly set by _setTokenURI
         // assert.tokenURI
         // Check that make was properly set
-        assert.equal(returnedMake, "Berg");
+        assert.equal(returnedMake, expectedMake);
         // Check that model was properly set
-        assert.equal(returnedModel, "Double");
+        assert.equal(returnedModel, expectedModel);
         // Check that style was properly set
-        assert.equal(returnedStyle, "Geyer");
+        assert.equal(returnedStyle, expectedStyle);
         // Check that serialNumber was properly set
         assert.equal(returnedSerialNumber, defaultSerialNumber);
         // Check that listPrice was properly set
@@ -626,6 +629,6 @@ contract Buyer {
     function deliveredAndTransfer(uint hornId) public returns (uint) {
         uint paymentAmt = market.markHornDeliveredAndOwnershipTransferred(hornId);
 
-        return paymentAmt
+        return paymentAmt;
     }
 }
