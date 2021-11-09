@@ -1,5 +1,6 @@
 NFT Marketplace & Escrow Contract for Classical Musicians
 by robriks github.com/robriks/consensys-academy-final-project
+hornosexual.eth (0x65b54A4646369D8ad83CB58A5a6b39F22fcd8cEe)
 # FEEL FREE TO SKIP TO TL;DR!
 
 Writeup:
@@ -34,6 +35,16 @@ TL;DR:
 6. Contract releases funds to seller        # Sale completed
 7. Profit ;) 
 
+Front-end Address: NETLIFY/HEROKU APP ADDRESS HERE
+
+In your README.md, be sure to have clear instructions on: 
+-Installing dependencies for your project 
+-Accessing or—if your project needs a server (not required)—running your project
+-Running your smart contract unit tests and which port a local testnet should be running on.
+-A screencast of you walking through your project, including submitting transactions and seeing the updated state. You can use a screenrecorder of your choosing or something like Loom, and you can share the link to the recording in your README.md
+
+Remember: DO NOT UPLOAD SENSITIVE INFORMATION TO GITHUB OR A PUBLIC SITE! Your Infura account details, MetaMask mnemonics, any private keys, etc., should all be in a .env file which you add to your .gitignore in your project locally. In your README.md, you should instruct the user on how to populate the .env locally with their own information.
+
+
 # Note: In practice, these steps would probably require use of QR codes to communicate with frontend/contract along the way, seeing as average classical musicians know little to nothing about web3; something to consider later.
-# pretty formatting later
 # Potential added features: messaging (frontend), emailed/txt receipts (frontend); rent-to-own (contract), create addresses on chain to simplify UX? (frontend), ..?

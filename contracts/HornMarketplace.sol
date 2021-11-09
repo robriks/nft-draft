@@ -3,7 +3,7 @@ pragma solidity 0.8.0;
 
 /** 
   * @title Peer to peer Horn Marketplace using NFTs and Escrow Smart Contract
-  * @author Markus Osterlund, 2nd Horn of National Symphony Orchestra and hopeful Ethereum Engineer @Consensys Academy Bootcamp
+  * @author Markus Osterlund aka hornosexual.eth, 2nd Horn of National Symphony Orchestra and hopeful Ethereum Engineer @Consensys Academy Bootcamp
  */
 
 import "@openzeppelin/contracts/utils/Counters.sol";
@@ -11,9 +11,7 @@ import "@openzeppelin/contracts/access/Ownable.sol";
 import "@openzeppelin/contracts/utils/escrow/Escrow.sol";
 import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
 import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
-// import "@openzeppelin/contracts/token/ERC721/IERC721Receiver.sol"; // Not actually necessary but included here in case users new to NFTs send to address(this)
 
-// use tokenURI to point to images of the listed instrument (host and store on my website)
 
 /*
    Interfaces
@@ -332,13 +330,11 @@ contract HornMarketplace is Ownable, /*IERC721Receiver, */ERC721Enumerable {
             revert("Horn is already marked as owned and not for sale");
         }
 
-        return(HornStatus.OwnedNotForSale); // make sure this is correct syntax
+        return(HornStatus.OwnedNotForSale);
     }
 
-    // function buyerInitiateRefund() does the buyer even need an option to get a refund once paid?
-
     /*
-        Helper functions that provide (internal?) getter functionality
+        Helper functions that provide getter functionality
     */
     // @dev Returns an array of hornId uints that are read by the front end to display Horns listed for sale
     function getCurrentHornsForSale() public view returns (uint[] memory) {
@@ -364,6 +360,14 @@ contract HornMarketplace is Ownable, /*IERC721Receiver, */ERC721Enumerable {
     function getEscrowDepositValue(address payee) public view returns (uint) {
         uint escrowBalance = escrow.depositsOf(payee);
         return escrowBalance;
+    }
+
+    function getBalanceOf(address _owner) public view returns (uint) {
+        balanceOf(_owner);
+    }
+
+    function getApprovedToSpend(uint _tokenId) public view returns (address) {
+        getApproved(_tokenId);
     }
 
     fallback() external payable {
