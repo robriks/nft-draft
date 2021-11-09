@@ -13,8 +13,8 @@ contract TestHornMarketplace {
     Buyer buyer;
     // EscrowContract escrow = EscrowContract(DeployedAddresses.EscrowContract());
     
-    uint defaultSerialNumber;
-    uint defaultListPrice;
+    uint32 defaultSerialNumber;
+    uint32 defaultListPrice;
 
     /*
         Constructor
@@ -40,7 +40,7 @@ contract TestHornMarketplace {
     function testOwnerOfEscrow() public {
         freshMarketplaceAndSellerBuyerInstance();
 
-        address /*payable*/ returnedOwnerOfEscrow = market.escrow.owner(); // this is ownable inherited function, may need to import ownable
+        address /*payable*/ returnedOwnerOfEscrow = market.getEscrowOwner(); // uses openzeppelin Ownable.sol function call
         address /*payable*/ correctOwnerOfEscrow = DeployedAddresses.HornMarketplace();
 
         Assert.equal(returnedOwnerOfEscrow, correctOwnerOfEscrow, "Owner of instantiated escrow contract does not match HornMarketplace contract address");
@@ -49,23 +49,22 @@ contract TestHornMarketplace {
     // @param Be sure to give the correct __hornId index of Horn struct in horns[] mapping or test will fail; finicky but other variables are private and don't want to add attribute storage costs for a simple test
     function testMintThenListNewHornNFT() public {
         freshMarketplaceAndSellerBuyerInstance();
-        address payable sellerAddress = DeployedAddresses.Seller();
         // Mints a fresh Horn NFT with defaultListPrice, increments serialNumber, returns currentHornId
         uint returnedHornId = seller.mintAndListFreshTestHorn();
         uint expectedHornId = 1; // Expected currentHornId should be 1 after minting to a fresh contract instance
-        uint returnedBalanceHornId = market.getBalanceOf(sellerAddress); // IMPORT ERC721
-        uint returnedListPrice = market.getListPriceByHornId(returnedHornId);
-        uint addedToForSaleArray = market.hornsForSale[0];
-        uint returnedSerialNumber = market.horns[returnedHornId].serialNumber;
-        string memory returnedMake = market.horns[returnedHornId].make;
+        uint returnedBalanceHornId = market.getBalanceOf(address(seller)); 
+        uint32 returnedListPrice = market.getListPriceByHornId(returnedHornId);
+        uint addedToForSaleArray = market.getHornForSaleByIndex(0);
+        uint32 returnedSerialNumber = market.getHornById(returnedHornId).serialNumber;
+        string memory returnedMake = market.getHornById(returnedHornId).make;
         string memory expectedMake = "Berg";
-        string memory returnedModel = market.horns[returnedHornId].model;
+        string memory returnedModel = market.getHornById(returnedHornId).model;
         string memory expectedModel = "Double";
-        string memory returnedStyle = market.horns[returnedHornId].style;
+        string memory returnedStyle = market.getHornById(returnedHornId).style;
         string memory expectedStyle = "Geyer";
         // tokenURI variables here
-        address payable returnedCurrentOwner = market.horns[returnedHornId].currentOwner;
-        address payable expectedCurrentOwner = sellerAddress;
+        address payable returnedCurrentOwner = market.getHornById(returnedHornId).currentOwner;
+        address payable expectedCurrentOwner = payable(address(seller));
 
         // Check that a fresh hornId was created
         Assert.equal(returnedHornId, expectedHornId, "returnedHornId given by mintAndListFreshTestHorn's Counter.Counter does not match the expectedHornId of 1 for a fresh contract instance's first mint");
@@ -74,13 +73,13 @@ contract TestHornMarketplace {
         // test _setTokenURI
         // Assert.tokenURI
         // Check that make was properly set
-        Assert.equal(returnedMake, expectedMake);
+        Assert.equal(returnedMake, expectedMake, "Make error");
         // Check that model was properly set
-        Assert.equal(returnedModel, expectedModel);
+        Assert.equal(returnedModel, expectedModel, "Model error");
         // Check that style was properly set
-        Assert.equal(returnedStyle, expectedStyle);
+        Assert.equal(returnedStyle, expectedStyle, "Style error");
         // Check that serialNumber was properly set
-        Assert.equal(returnedSerialNumber, defaultSerialNumber);
+        Assert.equal(returnedSerialNumber, defaultSerialNumber, "SerialNumber error");
         // Check status of the given index of struct mapping horns[__hornId]
         Assert.isTrue(testGetStatusOfHornById(returnedHornId, 0), "HornStatus enum returned does not match expected ListedForSale value");
         // Check that currentOwner of NFT was set to minter, in this case the seller address
@@ -88,7 +87,7 @@ contract TestHornMarketplace {
         // Check currentOwner in mapping vs struct attribute
         Assert.isTrue(testGetCurrentOwnerMappingAgainstStructAttributeByHornId(returnedHornId), "Current Owner returned by mapping does not match the one returned by the Horn NFT attribute");
         // Check that listPrice was updated
-        Assert.equal(returnedListPrice, defaultListPrice);
+        Assert.equal(returnedListPrice, defaultListPrice, "ListPrice error");
         // Check that hornsForSale[] uint[] array was updated to include returnedHornId
         Assert.equal(addedToForSaleArray, returnedHornId, "NFT hornId returned by hornsForSale[] uint[] array does not match the hornId that should have been pushed. Check index and execution of listExistingHornNFT()");
     }
@@ -101,23 +100,21 @@ contract TestHornMarketplace {
             "Berg",
             "Double",
             "Geyer", 
-            defaultSerialNumber,
-            defaultListPrice
+            defaultSerialNumber
         );
-        uint hornId = market._hornId.current();
         uint expectedHornId = 1; //Expected currentHornId should be 1 after minting to a fresh contract instance
 
         // tokenURI variables here
 
-        string memory returnedMake = market.horns[hornId].make;
+        string memory returnedMake = market.getHornById(returnedHornId).make;
         string memory expectedMake = "Berg";
-        string memory returnedModel = market.horns[hornId].model;
+        string memory returnedModel = market.getHornById(returnedHornId).model;
         string memory expectedModel = "Double";
-        string memory returnedStyle = market.horns[hornId].style;
+        string memory returnedStyle = market.getHornById(returnedHornId).style;
         string memory expectedStyle = "Geyer";
-        uint returnedSerialNumber = market.horns[hornId].serialNumber;
-        uint returnedListPrice = market.getListPriceByHornId(hornId);
-        address payable returnedCurrentOwner = market.horns[hornId].currentOwner;
+        uint32 returnedSerialNumber = market.getHornById(returnedHornId).serialNumber;
+        uint32 returnedListPrice = market.getListPriceByHornId(returnedHornId);
+        address payable returnedCurrentOwner = market.getHornById(returnedHornId).currentOwner;
         address payable expectedCurrentOwner = payable(address(this));
 
         // Check that a fresh hornId was created
@@ -125,37 +122,35 @@ contract TestHornMarketplace {
         // Check that tokenURI was properly set by _setTokenURI
         // Assert.tokenURI
         // Check that make was properly set
-        Assert.equal(returnedMake, expectedMake);
+        Assert.equal(returnedMake, expectedMake, "Make error");
         // Check that model was properly set
-        Assert.equal(returnedModel, expectedModel);
+        Assert.equal(returnedModel, expectedModel, "Model error");
         // Check that style was properly set
-        Assert.equal(returnedStyle, expectedStyle);
+        Assert.equal(returnedStyle, expectedStyle, "Style error");
         // Check that serialNumber was properly set
-        Assert.equal(returnedSerialNumber, defaultSerialNumber);
+        Assert.equal(returnedSerialNumber, defaultSerialNumber, "SerialNumber error");
         // Check that listPrice was properly set
-        Assert.equal(returnedListPrice, defaultListPrice);
+        Assert.equal(returnedListPrice, defaultListPrice, "Listprice error");
         // Check that HornStatus was set to OwnedNotForSale
-        Assert.isTrue(testGetStatusOfHornById(hornId, 3), "HornStatus was not successfully set to OwnedNotForSale, be sure nothing is throwing beforehand");
+        Assert.isTrue(testGetStatusOfHornById(returnedHornId, 3), "HornStatus was not successfully set to OwnedNotForSale, be sure nothing is throwing beforehand");
         // Check that currentOwner was set to this contract's address(this)
         Assert.equal(returnedCurrentOwner, expectedCurrentOwner, "The test contract minted the Horn NFT and should be currentOwner but isn't, check execution of mintButDontListNewHornNFT(");
     }
     // @dev Test listing an existing Horn NFT
     function testListingExistingHornNFT() public {
         freshMarketplaceAndSellerBuyerInstance();
-        market.mintButDontListNewHornNFT(
+        uint hornId = market.mintButDontListNewHornNFT(
             "Berg",
             "Double",
             "Geyer", 
-            defaultSerialNumber,
-            defaultListPrice
+            defaultSerialNumber
         );
 
-        uint hornId = market._hornId.current();
         //tokenURI variables here
-        uint newListPrice = defaultListPrice+ 1000;
+        uint32 newListPrice = defaultListPrice + 1000;
         market.listExistingHornNFT(hornId, newListPrice);
-        uint returnedListPrice = market.getListPriceByHornId(hornId);
-        uint addedToForSaleArray = market.hornsForSale[0];
+        uint32 returnedListPrice = market.getListPriceByHornId(hornId);
+        uint addedToForSaleArray = market.getHornForSaleByIndex(0);
 
         
         // Check that hornId was pushed into hornsForSale[] uint[] array
@@ -174,16 +169,15 @@ contract TestHornMarketplace {
     function testHornPurchase() public payable {
         // Set conditions to prepare for purchaseHornByHornId()
         freshMarketplaceAndSellerBuyerInstance();
-        seller.mintAndListFreshTestHorn();
+        uint hornId = seller.mintAndListFreshTestHorn();
 
-        uint hornId = market._hornId.current();
         string memory testAddress = "Ju St. Testing, Purchase Attempt New York, 11111";
         // This line uses this contract to buy, to provide some variety in testing
         market.purchaseHornByHornId(hornId, testAddress); // {value:}
 
         // @param Seller contract referenced because depositsOf refers to the payee, in this case the seller
-        uint returnedDeposits = market.escrow.depositsOf(DeployedAddresses.Seller());
-        uint hornListPrice = market.horns[hornId].listPrice;
+        uint returnedDeposits = market.escrow.depositsOf(address(seller));
+        uint32 hornListPrice = market.getListPriceByHornId(hornId);
         string memory returnedShippingAddress = market.shippingAddresses[address(this)];
         address returnedBuyerAddress = market.buyers[hornId];
         uint shouldHaveBeenDeleted = market.hornsForSale[0];
@@ -204,9 +198,8 @@ contract TestHornMarketplace {
     // @dev Ensure only Sellers can mark horn shipped
     function testMarkHornShipped() public {
         freshMarketplaceAndSellerBuyerInstance();
-        seller.mintAndListFreshTestHorn();
+        uint hornId = seller.mintAndListFreshTestHorn();
 
-        uint hornId = market._hornId.current();
         buyer.prepareForShipped(hornId); // {value: }
         seller.prepareForTransfer(hornId);
         
@@ -224,9 +217,8 @@ contract TestHornMarketplace {
     function testMarkHornShippedWithWrongAddress() public {
         // First sets conditions of exchange up to point where markHornShipped would be called
         freshMarketplaceAndSellerBuyerInstance();
-        seller.mintAndListFreshTestHorn();
+        uint hornId = seller.mintAndListFreshTestHorn();
 
-        uint hornId = market._hornId.current(); // may need to add a temporary test function in marketplace contract that returns _hornId.current()
         // Set correct address to prepare for comparison with the mistake address later entered by seller
         string memory realShipTo = buyer.prepareForShipped(hornId); // {value: }
 
@@ -244,13 +236,12 @@ contract TestHornMarketplace {
     function testMarkHornDeliveredAndOwnershipTransferred() public {
         // Set conditions of exchange up to the point where markHornDeliveredAndOwnershipTransferred would be called
         freshMarketplaceAndSellerBuyerInstance();
-        seller.mintAndListFreshTestHorn();
+        uint hornId = seller.mintAndListFreshTestHorn();
 
-        uint hornId = market._hornId.current();
         buyer.prepareForShipped(hornId); // {value: listPrice} 
 
         uint returnedPaymentAmt = buyer.deliveredAndTransfer(hornId);
-        uint hornListPrice = market.horns[hornId].listPrice;
+        uint32 hornListPrice = market.getListPriceByHornId(hornId);
 
 
         address payable currentOwnerViaMapping = market.getCurrentOwnerByMapping(hornId);
@@ -291,9 +282,8 @@ contract TestHornMarketplace {
     // @dev Ensures only buyer can markHornDeliveredAndOwnershipTransferred
     function testOnlyBuyerWhoPaid() public {
         freshMarketplaceAndSellerBuyerInstance();
-        seller.mintAndListFreshTestHorn();
+        uint hornId = seller.mintAndListFreshTestHorn();
 
-        uint hornId = market._hornId.current();
         buyer.prepareForShipped(hornId); // {value:}
         seller.prepareForTransfer(hornId);
 
@@ -304,9 +294,8 @@ contract TestHornMarketplace {
     // @dev Attempts to call listExistingHornNFT() from non-seller address who isn't currentOwner of the horn NFT
     function testOnlySellerViaList() public {
         freshMarketplaceAndSellerBuyerInstance();
-        seller.mintAndListFreshTestHorn();
+        uint hornId = seller.mintAndListFreshTestHorn();
 
-        uint hornId = market._hornId.current();
         // @dev Impersonator tries to sell someone else's NFT for 1 ether
         // @notice Following function is called by an account that isn't the same one who minted
         bool sellerImpersonation = market.listExistingHornNFT(hornId, 1000000000000000000); // {from: accounts[1]}
@@ -316,9 +305,8 @@ contract TestHornMarketplace {
     // @dev Attempts to call markHornShipped() from non-seller address who isn't currentOwner of the horn NFT
     function testOnlySellerViaMarkShipped() public {
         freshMarketplaceAndSellerBuyerInstance();
-        seller.mintAndListFreshTestHorn();
+        uint hornId = seller.mintAndListFreshTestHorn();
 
-        uint hornId = market._hornId.current();
         string memory testShipTo = buyer.prepareForShipped(hornId); // {value:}
 
         bool shipperImpersonation = market.markHornShipped(hornId, testShipTo);
@@ -328,9 +316,8 @@ contract TestHornMarketplace {
     // @dev Attempts to call purchaseHornById without having paid enough ETH in msg.value
     function testPaidEnough() public {
         freshMarketplaceAndSellerBuyerInstance();
-        seller.mintAndListFreshTestHorn();
+        uint hornId = seller.mintAndListFreshTestHorn();
 
-        uint hornId = market._hornId.current();
         bool paidTooMuch = market.purchaseHornByHornId{ value: 5000000000000000005 }
             (    //{from:buyer} address(this) ??
             hornId, 
@@ -342,16 +329,8 @@ contract TestHornMarketplace {
     // @dev Attempts to call purchaseHornById on a horn that is not currently listed for sale
     function testForSale() public {
         freshMarketplaceAndSellerBuyerInstance();
-        seller.mintAndListFreshTestHorn();
-        // market.mintButDontListNewHornNFT( // ONLY IF INITIATEREFUND FUNCTION HAVING ISSUES
-        //     "Berg",
-        //     "Double",
-        //     "Geyer",
-        //     serialNumberCounter,
-        //     420000000000000000
-        // );
+        uint hornId = seller.mintAndListFreshTestHorn();
 
-        uint hornId = market._hornId.current(); 
         // Set minted NFT to OwnedNotForSale status
         market.initiateRefundOrSetStatusToOwnedNotForSale(hornId);
 
@@ -367,9 +346,8 @@ contract TestHornMarketplace {
     // @dev Attempts to call markHornShipped when horn is not yet paid for in escrow
     function testHornPaidFor() public {
         freshMarketplaceAndSellerBuyerInstance();
-        seller.mintAndListFreshTestHorn();
+        uint hornId = seller.mintAndListFreshTestHorn();
 
-        uint hornId = market._hornId.current();
         bool stillWaitingOnFunds = market.markHornShipped(hornId, "No moneys in Escrow yet lelz"); // {from: seller}
 
         Assert.isFalse(stillWaitingOnFunds, "A silly seller somehow shipped a horn without receiving payment");
@@ -377,9 +355,8 @@ contract TestHornMarketplace {
     // @dev Attempts to call markHornDeliveredAndOwnershipTransferred when horn is not yet marked shipped by seller
     function testShipped() public {
         freshMarketplaceAndSellerBuyerInstance();
-        seller.mintAndListFreshTestHorn();
+        uint hornId = seller.mintAndListFreshTestHorn();
 
-        uint hornId = market._hornId.current();
         buyer.prepareForShipped(hornId); // {value: listPrice}
 
         bool notShippedYet = market.markHornDeliveredAndOwnershipTransferred(hornId); // {from: buyer}
@@ -408,9 +385,8 @@ contract TestHornMarketplace {
     function testSellerInitiateRefundOrSetStatusToOwnedNotForSale() public {
        // set conditions to identify an NFT that is ListedForSale
        freshMarketplaceAndSellerBuyerInstance();
-       seller.mintAndListFreshHorn();
+       uint hornId = seller.mintAndListFreshHorn();
 
-       uint hornId = market._hornId.current();
        uint returnedStatus = uint(market.sellerInitiateRefundOrSetStatusToOwnedNotForSale(hornId));
        uint expectedStatus = 3;
 
@@ -421,15 +397,14 @@ contract TestHornMarketplace {
     function testSellerInitiateRefundOrSetStatusToOwnedNotForSaleFromOwnedNotForSale() public {
         // set conditions to identify an NFT that is OwnedNotForSale
         freshMarketplaceAndSellerBuyerInstance();
-        market.mintButDontListNewHornNFT(
+        uint hornId = market.mintButDontListNewHornNFT(
             "Berg",
             "Double",
             "Geyer", 
-            defaultSerialNumber, // serialNumberCounter is now inside of Seller contract and not accessible by this function, so a default was made
+            defaultSerialNumber, // serialNumberCounter is inside of Seller contract and not accessible by this function, so a default was made
             defaultListPrice
         );
 
-        uint hornId = market._hornId.current();
         bool revertedByElseIf = market.sellerInitiateRefundOrSetStatusToOwnedNotForSale(hornId);
 
         Assert.isFalse(revertedByElseIf, "Function call error; it should have reverted because Horn is already set to OwnedNotForSale");
@@ -439,9 +414,8 @@ contract TestHornMarketplace {
     function testSellerInitiateRefundOrSetStatusToOwnedNotForSaleFromPaidFor() public {
         // set conditions to identify an NFT that is PaidFor
         freshMarketplaceAndSellerBuyerInstance();
-        seller.mintAndListFreshHorn();
+        uint hornId = seller.mintAndListFreshHorn();
 
-        uint hornId = market._hornId.current();
         buyer.prepareForShipped(hornId); // {value:}
 
         bool tooLateTakeTheMoney = market.sellerInitiateRefundOrSetStatusToOwnedNotForSale(hornId);
@@ -452,9 +426,8 @@ contract TestHornMarketplace {
     function testSellerInitiateRefundOrSetStatusToOwnedNotForSaleFromShipped() public {
         // set conditions to identify an NFT that is Shipped
         freshMarketplaceAndSellerBuyerInstance();
-        seller.mintAndListFreshHorn();
+        uint hornId = seller.mintAndListFreshHorn();
 
-        uint hornId = market._hornId.current();
         buyer.prepareForShipped(hornId); // {value:}
         seller.prepareForTransfer(hornId);
 
@@ -491,8 +464,7 @@ contract TestHornMarketplace {
         // set conditions to have three NFTs for sale and one not for sale, then purchases 2 and 4, removing them from hornsForSale[] array
         freshMarketplaceAndSellerBuyerInstance();
         seller.mintAndListFreshHorn(); // Id should == 1
-        seller.mintAndListFreshHorn(); // Id should == 2
-        uint firstTestHornId = market._hornId.current(); // should == 2
+        uint firstTestHornId = seller.mintAndListFreshHorn(); // Id should == 2
         market.mintButDontListNewHornNFT( // Id should == 3
             "Berg",
             "Double",
@@ -502,8 +474,7 @@ contract TestHornMarketplace {
         );
         // @dev Purchases the listed firstTestHornId and thereby 'deletes' it from the hornsForSale[] uint[] array by resetting its value to 0
         buyer.prepareForShipped(firstTestHornId); // {value: listPrice}
-        seller.mintAndListFreshHorn(); // Id should == 4
-        uint secondTestHornId = market._hornId.current(); // should == 4
+        uint secondTestHornId = seller.mintAndListFreshHorn(); // Id should == 4
         buyer.prepareForShipped(secondTestHornId); // {value: listPrice}
         // @dev Purchases the listed secondTestHornId and thereby 'deletes' it from the hornsForSale[] uint[] array by resetting its value to 0
         
@@ -516,9 +487,9 @@ contract TestHornMarketplace {
     // @dev Test price getter function of listPrice attribute inside horn struct of given HornId
     // @notice This function is used as a helper at different stages of the transaction to track intended behavior
     function testGetListPriceByHornId(uint __hornId) public returns (bool) {
-        require(market.horns[__hornId].listPrice > 0, "Horn NFT listPrice appears to be 0, check mint execution");
-        uint expectedPrice = market.horns[__hornId].listPrice;
-        uint returnedPrice = market.getListPriceByHornId(__hornId);
+        require(market.getHornById(__hornId).listPrice > 0, "Horn NFT listPrice appears to be 0, check mint execution");
+        uint32 expectedPrice = market.getHornById(__hornId).listPrice;
+        uint32 returnedPrice = market.getListPriceByHornId(__hornId);
 
         require(expectedPrice == returnedPrice, "Expected listPrice attribute of horn NFT struct does not match the one given by marketplace getter function");
         return true;
@@ -593,14 +564,13 @@ contract Seller {
     function mintAndListFreshTestHorn() public returns (uint) {
         serialNumberCounter++;
 
-        market.mintThenListNewHornNFT( // WILL THIS refer to the newly instantiated market?
+        uint currentHornId = market.mintThenListNewHornNFT(
             "Berg",
             "Double",
             "Geyer", 
             serialNumberCounter,
             defaultListPrice
         );
-        uint currentHornId = market._hornId.current();
 
         return currentHornId;
     }

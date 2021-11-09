@@ -62,7 +62,7 @@ contract HornMarketplace is Ownable, /*IERC721Receiver, */ERC721Enumerable {
     uint[] public hornsForSale;
 
     // @notice horns mapping keeps track of all horn NFT owners & histories via _hornId (s/o to OpenZep Counter.counter library)
-    mapping (uint => Horn) horns;
+    mapping (uint => Horn) public horns;
     // @dev Add hash of horn NFT make and serialNumber using Counter.counter to compare all existing hashes to new mints to prevent duplicate NFTs of the same instrument
     mapping (uint => bytes32) makeAndSerialHashes; // bytes32? bytes memorY?
     // @dev currentOwners and buyers mappings used for function access control
@@ -337,12 +337,20 @@ contract HornMarketplace is Ownable, /*IERC721Receiver, */ERC721Enumerable {
         Helper functions that provide getter functionality
     */
     // @dev Returns an array of hornId uints that are read by the front end to display Horns listed for sale
+    function getHornByIndex(uint _index) public view returns (Horn memory) {
+        return horns[_index];
+    }
+
     function getCurrentHornsForSale() public view returns (uint[] memory) {
         return hornsForSale;
     }
 
+    function getHornForSaleByIndex(uint _index) public view returns (uint) {
+        return hornsForSale[_index];
+    }
+
     function getListPriceByHornId(uint __hornId) public view returns (uint32) {
-        return horns[__hornId].listPrice;
+        return horns[__hornId].listPrice; 
     }
 
     function getCurrentOwnerByMapping(uint __hornId) public view returns (address payable) {
@@ -368,6 +376,10 @@ contract HornMarketplace is Ownable, /*IERC721Receiver, */ERC721Enumerable {
 
     function getApprovedToSpend(uint _tokenId) public view returns (address) {
         getApproved(_tokenId);
+    }
+
+    function getEscrowOwner() public view returns (address) {
+        escrow.owner();
     }
 
     fallback() external payable {

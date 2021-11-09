@@ -43,6 +43,7 @@ Horn NFT Contract:
   -tokenURI metadata
   -hosted on front end website
 -review events
+-FIX HORNID INDEXING MAPPING SHIT
 
 Test Contract:
 -certain tests cannot be carried out in Solidity via a testing smart contract: notably EVENTS, LOGS must be done in javascript
