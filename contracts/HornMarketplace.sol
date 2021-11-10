@@ -40,8 +40,8 @@ contract HornMarketplace is Ownable, /*IERC721Receiver, */ERC721Enumerable {
       string make;
       string model;
       string style;
-      uint32 serialNumber;
-      uint32 listPrice; // this attribute probably needs to be labeled as 'inWei' and converted from eth at time of listing
+      uint serialNumber;
+      uint listPrice; // this attribute probably needs to be labeled as 'inWei' and converted from eth at time of listing
       HornStatus status;
       address payable currentOwner;
     }
@@ -68,8 +68,8 @@ contract HornMarketplace is Ownable, /*IERC721Receiver, */ERC721Enumerable {
     // @dev currentOwners and buyers mappings used for function access control
     // @dev Add address to buyers when horn is paid for via escrow, address to currentOwners when sale and exchange is complete
     mapping (uint => address) currentOwners;
-    mapping (uint => address) buyers;
-    mapping (address => string) shippingAddresses; // @param May actually be cheaper to enter and store bytes type via front-end
+    mapping (uint => address) public buyers;
+    mapping (address => string) public shippingAddresses; // @param May actually be cheaper to enter and store bytes type via front-end
     
     // @notice NFT and IRL exchange events and escrow transaction events used for front-end
     event HornListedForSale(uint indexed hornId, address indexed seller, string indexed make);
@@ -92,7 +92,7 @@ contract HornMarketplace is Ownable, /*IERC721Receiver, */ERC721Enumerable {
     // }
 
     // @dev Restrict duplicate listings and allow only users who are minting their instrument as an NFT for the first time by checking hashes of concatenated make and serial number
-    modifier nonDuplicateMint(string calldata _make, uint32 _serialNumber) {
+    modifier nonDuplicateMint(string calldata _make, uint _serialNumber) {
         //Hash concatenated _make and _serialNumber given by user
         bytes32 hashOfMakeAndSerial = keccak256(abi.encodePacked(_make, _serialNumber)); // bytes32? bytes memory?
         //Loop through makeAndSerialHashes[] mapping in search for a matching hash, in which case given user input is a duplicate mint
@@ -146,8 +146,8 @@ contract HornMarketplace is Ownable, /*IERC721Receiver, */ERC721Enumerable {
       string calldata _make, 
       string calldata _model, 
       string calldata _style, 
-      uint32 _serialNumber, 
-      uint32 _desiredPrice) 
+      uint _serialNumber, 
+      uint _desiredPrice) 
       external 
       /* nonDuplicateMint(uint(_hornId.current())++, _make, _serialNumber) */ // double check how the Counter.counter works with _hornId in a modifier _; setting
       returns (uint) {
@@ -184,7 +184,7 @@ contract HornMarketplace is Ownable, /*IERC721Receiver, */ERC721Enumerable {
       string calldata _make,
       string calldata _model,
       string calldata _style,
-      uint32 _serialNumber) 
+      uint _serialNumber) 
       external
       nonDuplicateMint(_make, _serialNumber) 
       returns (uint) {
@@ -214,7 +214,7 @@ contract HornMarketplace is Ownable, /*IERC721Receiver, */ERC721Enumerable {
         }
     
     // @notice Following function must check that the hornNFT already exists before listing
-    function listExistingHornNFT(uint __hornId, uint32 _desiredPrice) 
+    function listExistingHornNFT(uint __hornId, uint _desiredPrice) 
       public 
       onlySeller(__hornId) 
       returns (uint) {
@@ -337,7 +337,7 @@ contract HornMarketplace is Ownable, /*IERC721Receiver, */ERC721Enumerable {
         Helper functions that provide getter functionality
     */
     // @dev Returns an array of hornId uints that are read by the front end to display Horns listed for sale
-    function getHornByIndex(uint _index) public view returns (Horn memory) {
+    function getHornById(uint _index) public view returns (Horn memory) { //THIS STRUCT NEEDS TO BE UNPACKED TO PROPERLY COMPILE/TEST BETWEEN CONTRACTS
         return horns[_index];
     }
 
@@ -345,11 +345,7 @@ contract HornMarketplace is Ownable, /*IERC721Receiver, */ERC721Enumerable {
         return hornsForSale;
     }
 
-    function getHornForSaleByIndex(uint _index) public view returns (uint) {
-        return hornsForSale[_index];
-    }
-
-    function getListPriceByHornId(uint __hornId) public view returns (uint32) {
+    function getListPriceByHornId(uint __hornId) public view returns (uint) {
         return horns[__hornId].listPrice; 
     }
 
@@ -375,7 +371,8 @@ contract HornMarketplace is Ownable, /*IERC721Receiver, */ERC721Enumerable {
     }
 
     function getApprovedToSpend(uint _tokenId) public view returns (address) {
-        getApproved(_tokenId);
+        address _approved = getApproved(_tokenId);
+        return _approved;
     }
 
     function getEscrowOwner() public view returns (address) {

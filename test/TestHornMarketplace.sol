@@ -13,8 +13,8 @@ contract TestHornMarketplace {
     Buyer buyer;
     // EscrowContract escrow = EscrowContract(DeployedAddresses.EscrowContract());
     
-    uint32 defaultSerialNumber;
-    uint32 defaultListPrice;
+    uint defaultSerialNumber;
+    uint defaultListPrice;
 
     /*
         Constructor
@@ -53,9 +53,9 @@ contract TestHornMarketplace {
         uint returnedHornId = seller.mintAndListFreshTestHorn();
         uint expectedHornId = 1; // Expected currentHornId should be 1 after minting to a fresh contract instance
         uint returnedBalanceHornId = market.getBalanceOf(address(seller)); 
-        uint32 returnedListPrice = market.getListPriceByHornId(returnedHornId);
-        uint addedToForSaleArray = market.getHornForSaleByIndex(0);
-        uint32 returnedSerialNumber = market.getHornById(returnedHornId).serialNumber;
+        uint returnedListPrice = market.getListPriceByHornId(returnedHornId);
+        uint addedToForSaleArray = market.hornsForSale(0);
+        uint returnedSerialNumber = market.getHornById(returnedHornId).serialNumber;
         string memory returnedMake = market.getHornById(returnedHornId).make;
         string memory expectedMake = "Berg";
         string memory returnedModel = market.getHornById(returnedHornId).model;
@@ -112,8 +112,8 @@ contract TestHornMarketplace {
         string memory expectedModel = "Double";
         string memory returnedStyle = market.getHornById(returnedHornId).style;
         string memory expectedStyle = "Geyer";
-        uint32 returnedSerialNumber = market.getHornById(returnedHornId).serialNumber;
-        uint32 returnedListPrice = market.getListPriceByHornId(returnedHornId);
+        uint returnedSerialNumber = market.getHornById(returnedHornId).serialNumber;
+        uint returnedListPrice = market.getListPriceByHornId(returnedHornId);
         address payable returnedCurrentOwner = market.getHornById(returnedHornId).currentOwner;
         address payable expectedCurrentOwner = payable(address(this));
 
@@ -147,10 +147,10 @@ contract TestHornMarketplace {
         );
 
         //tokenURI variables here
-        uint32 newListPrice = defaultListPrice + 1000;
+        uint newListPrice = defaultListPrice + 1000;
         market.listExistingHornNFT(hornId, newListPrice);
-        uint32 returnedListPrice = market.getListPriceByHornId(hornId);
-        uint addedToForSaleArray = market.getHornForSaleByIndex(0);
+        uint returnedListPrice = market.getListPriceByHornId(hornId);
+        uint addedToForSaleArray = market.hornsForSale(0);
 
         
         // Check that hornId was pushed into hornsForSale[] uint[] array
@@ -176,11 +176,11 @@ contract TestHornMarketplace {
         market.purchaseHornByHornId(hornId, testAddress); // {value:}
 
         // @param Seller contract referenced because depositsOf refers to the payee, in this case the seller
-        uint returnedDeposits = market.escrow.depositsOf(address(seller));
-        uint32 hornListPrice = market.getListPriceByHornId(hornId);
-        string memory returnedShippingAddress = market.shippingAddresses[address(this)];
-        address returnedBuyerAddress = market.buyers[hornId];
-        uint shouldHaveBeenDeleted = market.hornsForSale[0];
+        uint returnedDeposits = market.getEscrowDepositValue(address(seller));
+        uint hornListPrice = market.getListPriceByHornId(hornId);
+        string memory returnedShippingAddress = market.shippingAddresses(address(this));
+        address returnedBuyerAddress = market.buyers(hornId);
+        uint shouldHaveBeenDeleted = market.hornsForSale(0);
 
         // Check that escrow deposit was executed properly
         Assert.equal(returnedDeposits, hornListPrice, "Amount of deposited funds to escrow contract does not match the listPrice attribute of the horn NFT, check escrow deposit execution");
@@ -205,9 +205,9 @@ contract TestHornMarketplace {
         
         // Check that approval for __hornId given to marketplace contract was carried out
         address returnedApprovedAddressForHornId = market.getApprovedToSpend(hornId);
-        address expectedApprovedAddressForHornId = DeployedAddresses.Buyer();
+        address expectedApprovedAddressForHornId = market.buyers(hornId);
         
-        Assert.Equal(returnedApprovedAddressForHornId, expectedApprovedAddressForHornId, "Returned approved address for tokenId doesn't match expected address, check execution of Approve()");
+        Assert.equal(returnedApprovedAddressForHornId, expectedApprovedAddressForHornId, "Returned approved address for tokenId doesn't match expected address, check execution of Approve()");
 
         // Use helper function to check that status was updated to Shipped
         Assert.isTrue(testGetStatusOfHornById(hornId, 2), "HornStatus was not successfully updated to Shipped, check execution of markHornShipped()");
@@ -222,14 +222,26 @@ contract TestHornMarketplace {
         // Set correct address to prepare for comparison with the mistake address later entered by seller
         string memory realShipTo = buyer.prepareForShipped(hornId); // {value: }
 
-        // Feed in a wrong address to ensure require() line prevents seller from shipping to the wrong place
-        string memory mistakeShipTo = "21 Million Silk Rd. Darknet, Metaverse 66666";
-        bool mistakenShippingAddress = market.markHornShipped(hornId, mistakeShipTo);
+
+        bool mistakenShippingAddress; 
+
+        (mistakenShippingAddress, ) = address(this).call(abi.encodePacked(this.wrongAddressThrows.selector));
+
+        // // Feed in a wrong address to ensure require() line prevents seller from shipping to the wrong place // DELETE WHEN YOU PROVE THIS TEST FOR EXCEPTION WORKS
+        // string memory mistakeShipTo = "21 Million Silk Rd. Darknet, Metaverse 66666";
+        // bool mistakenShippingAddress = market.markHornShipped(hornId, mistakeShipTo);
 
         // Use helper function to check that status is still PaidFor and didn't execute change to Shipped
         Assert.isTrue(testGetStatusOfHornById(hornId, 1), "HornStatus was somehow changed, check execution of markHornShipped");
         // Ascertain mistakenShippingAddress is falsy and didn't execute markHornShipped
-        Assert.isFalse(mistakenShippingAddress, "A seller somehow managed to ship a horn to the wrong address");
+        Assert.isFalse(mistakenShippingAddress, "Against all odds, a seller somehow managed to ship a horn to the wrong address");
+    }
+    // @dev Helper function that is intended to throw on execution due to shippingAddress mismatch
+    function wrongAddressThrows() public {
+        uint _hornId = 1;
+        // Feed in a wrong address to ensure require() line prevents seller from shipping to the wrong place
+        string memory mistakeShipTo = "21 Million Silk Rd. Darknet, Metaverse 66666";
+        market.markHornShipped(_hornId, mistakeShipTo);
     }
 
     // @dev Ensure markHornDeliveredAndOwnershipTransferred is working as intended
@@ -241,21 +253,20 @@ contract TestHornMarketplace {
         buyer.prepareForShipped(hornId); // {value: listPrice} 
 
         uint returnedPaymentAmt = buyer.deliveredAndTransfer(hornId);
-        uint32 hornListPrice = market.getListPriceByHornId(hornId);
-
+        uint hornListPrice = market.getListPriceByHornId(hornId);
 
         address payable currentOwnerViaMapping = market.getCurrentOwnerByMapping(hornId);
         
-        address returnedBuyerOfHornId = market.buyers[hornId];
+        address returnedBuyerOfHornId = market.buyers(hornId);
         address expectedBuyerOfHornIdShouldBe0 = address(0); // can address(0) be payable?
 
-        string memory returnedShippingAddressesString = market.shippingAddresses[buyer];
+        string memory returnedShippingAddressesString = market.shippingAddresses(address(buyer));
         string memory expectedShippingAddressesStringShouldBeEmpty = "";
 
         
-        uint escrowBalanceOfSeller = market.escrow.depositsOf(DeployedAddresses.Seller());
+        uint escrowBalanceOfSeller = market.getEscrowDepositValue(address(seller));
         //@notice ERC721 balanceOf() method actually returns a uint[] array, so in case of multiple NFTs the following line would need to be reworked to loop through the returned array
-        uint tokenIdTransferredToBuyer = market.getBalanceOf(buyer);
+        uint tokenIdTransferredToBuyer = market.getBalanceOf(address(buyer));
 
         // Check escrow.withdraw(horns[__hornId].currentOwner) was properly sent to the seller
         Assert.equal(returnedPaymentAmt, hornListPrice, "Payment amount returned by markHornDeliveredAndOwnershipTransferred() does not match Horn NFT listPrice attribute");
@@ -267,11 +278,11 @@ contract TestHornMarketplace {
         Assert.equal(returnedShippingAddressesString, expectedShippingAddressesStringShouldBeEmpty, "String returned by shippingAddresses[buyer] was not successfully zeroed out");
 
         // Check that HornStatus status of hornNFT was correctly updated to OwnedNotForSale (== 3)
-        Assert.isTrue(testGetStatusOfHornById(hornId, 3));
+        Assert.isTrue(testGetStatusOfHornById(hornId, 3), "HornStatus of Horn NFT was not correctly updated to OwnedNotForSale");
         // Check that currentOwner was correctly updated to buyer
-        Assert.equal(currentOwnerViaMapping, payable(DeployedAddresses.Buyer()), "CurrentOwner of Horn NFT as returned by storage mapping does not match expected address");
+        Assert.equal(currentOwnerViaMapping, address(buyer), "CurrentOwner of Horn NFT as returned by storage mapping does not match expected address");
         // Check that currentOwner is consistent in both the mapping and the struct attribute
-        Assert.isTrue(testGetCurrentOwnerMappingAgainstStructAttributeByHornId(hornId));
+        Assert.isTrue(testGetCurrentOwnerMappingAgainstStructAttributeByHornId(hornId), "CurrentOwner returned by mapping does not match struct attribute");
 
         // Check that ERC721 method safeTransferFrom was executed properly
         Assert.equal(tokenIdTransferredToBuyer, hornId, "BalanceOf buyer address doesn't reflect the hornId that should have been transferred, check execution of safeTransferFrom()");
@@ -287,20 +298,31 @@ contract TestHornMarketplace {
         buyer.prepareForShipped(hornId); // {value:}
         seller.prepareForTransfer(hornId);
 
-        bool thieveryAttempt = market.markHornDeliveredAndOwnershipTransferred(hornId); // {from: msg.sender} may need this line because this contract isn't an IERC721TokenReceiver to pass the market's safeTransferFrom() method
+        bool thieveryAttempt;
+        (thieveryAttempt, ) = address(this).call(abi.encodePacked(this.noPayNoWay.selector));
         
         Assert.isFalse(thieveryAttempt, "An account that hasn't paid or been marked as buyer pilfered the NFT!");
     }
+    // @dev Helper function that is intended to throw on execution due to this contract not being a buyer who already paid
+    function noPayNoWay() public {
+        market.markHornDeliveredAndOwnershipTransferred(1);
+    }
+
     // @dev Attempts to call listExistingHornNFT() from non-seller address who isn't currentOwner of the horn NFT
     function testOnlySellerViaList() public {
         freshMarketplaceAndSellerBuyerInstance();
-        uint hornId = seller.mintAndListFreshTestHorn();
+        uint hornId = seller.mintButDontListFreshTestHorn();
 
         // @dev Impersonator tries to sell someone else's NFT for 1 ether
         // @notice Following function is called by an account that isn't the same one who minted
-        bool sellerImpersonation = market.listExistingHornNFT(hornId, 1000000000000000000); // {from: accounts[1]}
+        bool sellerImpersonation;
+        (sellerImpersonation, ) = address(this).call(abi.encodePacked(this.noGoodsNoGo.selector));
 
         Assert.isFalse(sellerImpersonation, "A rogue account was able to sell a horn NFT that it didn't own");
+    }
+    // @dev Helper function intended to throw on execution via this contract not being the owner of the token
+    function noGoodsNoGo() public {
+        market.listExistingHornNFT(1, defaultListPrice);
     }
     // @dev Attempts to call markHornShipped() from non-seller address who isn't currentOwner of the horn NFT
     function testOnlySellerViaMarkShipped() public {
@@ -309,22 +331,40 @@ contract TestHornMarketplace {
 
         string memory testShipTo = buyer.prepareForShipped(hornId); // {value:}
 
-        bool shipperImpersonation = market.markHornShipped(hornId, testShipTo);
+        bool shipperImpersonation;
+        (shipperImpersonation, ) = address(this).call(abi.encodePacked(this.noShippingForYou.selector));
 
         Assert.isFalse(shipperImpersonation, "A pirate just impersonated a shipper and shipped a horn they don't own");
+    }
+    // @dev Helper function intended to throw on execution via this contract not being the seller who can ship
+    function noShippingForYou() public {
+        market.markHornShipped(1, "TrumpTower");
     }
     // @dev Attempts to call purchaseHornById without having paid enough ETH in msg.value
     function testPaidEnough() public {
         freshMarketplaceAndSellerBuyerInstance();
         uint hornId = seller.mintAndListFreshTestHorn();
 
-        bool paidTooMuch = market.purchaseHornByHornId{ value: 5000000000000000005 }
-            (    //{from:buyer} address(this) ??
-            hornId, 
-            "420 69th St. Phallus, Virgin Islands 42069"
-            ); 
+        bool paidTooMuch;
+        (paidTooMuch, ) = address(this).call(abi.encodePacked(this.noCharityPlease.selector));
+        
+        // market.purchaseHornByHornId{ value: tooMuch }
+        //     (
+        //     hornId, 
+        //     "420 69th St. Phallus, Virgin Islands 42069"
+        //     );
 
         Assert.isFalse(paidTooMuch, "A generous soul got ripped off and was able to purchase a horn with msg.value that didn't match listPrice");
+    }
+    // @dev Helper function intended to throw on execution via msg.value being more than the listPrice
+    function noCharityPlease() public {
+        uint tooMuch = defaultListPrice + 42069;
+
+        market.purchaseHornByHornId{ value: tooMuch }
+            (
+            1, 
+            "420 69th St. Phallus, Virgin Islands 42069"
+            );
     }
     // @dev Attempts to call purchaseHornById on a horn that is not currently listed for sale
     function testForSale() public {
@@ -332,15 +372,20 @@ contract TestHornMarketplace {
         uint hornId = seller.mintAndListFreshTestHorn();
 
         // Set minted NFT to OwnedNotForSale status
-        market.initiateRefundOrSetStatusToOwnedNotForSale(hornId);
+        market.sellerInitiateRefundOrSetStatusToOwnedNotForSale(hornId);
 
-        bool yourMoneyNotWelcomeHere = market.purchaseHornByHornId{ value: 420000000000000000 }
-            (
-            hornId,
-            "420 69th St. Phallus, Virgin Islands 42069"
-            );
+        bool yourMoneyNotWelcomeHere;
+        (yourMoneyNotWelcomeHere, ) = address(this).call(abi.encodePacked(this.cannotBeBought.selector));
 
         Assert.isFalse(yourMoneyNotWelcomeHere, "A sneaky user found a way to buy without being given consent");
+    }
+    // @dev Helper function intended to throw on execution via Horn not being ListedForSale
+    function cannotBeBought() public {
+        market.purchaseHornByHornId{ value: defaultListPrice }
+            (
+            1,
+            "420 69th St. Phallus, Virgin Islands 42069"
+            );
     }
     
     // @dev Attempts to call markHornShipped when horn is not yet paid for in escrow
@@ -348,9 +393,14 @@ contract TestHornMarketplace {
         freshMarketplaceAndSellerBuyerInstance();
         uint hornId = seller.mintAndListFreshTestHorn();
 
-        bool stillWaitingOnFunds = market.markHornShipped(hornId, "No moneys in Escrow yet lelz"); // {from: seller}
+        bool stillWaitingOnFunds;
+        (stillWaitingOnFunds, ) = address(this).call(abi.encodePacked(this.wheresTheMoney.selector));
 
         Assert.isFalse(stillWaitingOnFunds, "A silly seller somehow shipped a horn without receiving payment");
+    }
+    // @dev Helper function intended to throw on execution because Escrow has not received funds yet
+    function wheresTheMoney() public {
+        market.markHornShipped(1, "No moneys in Escrow yet lelz");
     }
     // @dev Attempts to call markHornDeliveredAndOwnershipTransferred when horn is not yet marked shipped by seller
     function testShipped() public {
@@ -359,33 +409,42 @@ contract TestHornMarketplace {
 
         buyer.prepareForShipped(hornId); // {value: listPrice}
 
-        bool notShippedYet = market.markHornDeliveredAndOwnershipTransferred(hornId); // {from: buyer}
+        bool notShippedYet;
+        (notShippedYet, ) = address(this).call(abi.encodePacked(this.tooEarly.selector));
 
         Assert.isFalse(notShippedYet, "Horn can not be marked delivered and NFT ownership transferred since it has not yet been marked shipped");
     }
+    // @dev Helper function intended to throw on execution because Horn has not been shipped yet
+    function tooEarly() public {
+        market.markHornDeliveredAndOwnershipTransferred(1);
+    }
     // @dev Attempts to mint a duplicate Horn NFT, which should fail the nonDuplicateMint modifier
+    // @param serialNumberCounter causes a hash collision against 1 since it was reset in the re-instantiated Seller contract above and incremented by mintAndListFreshTestHorn
     function testNonDuplicateMint() public {
         freshMarketplaceAndSellerBuyerInstance();
         seller.mintAndListFreshTestHorn();
 
-        // @param serialNumberCounter causes a hash collision against 1 since it was reset in the re-instantiated Seller contract above and incremented by mintAndListFreshTestHorn
-        bool copycatMint = market.mintThenListNewHornNFT( // minting from address(this), not the seller contract as above
+        bool copycatMint;
+        (copycatMint, ) = address(this).call(abi.encodePacked(this.rightClickSaver.selector));
+
+        Assert.isFalse(copycatMint, "A corrupt copycat was able to mint a Horn NFT with duplicate hash of make and serialNumber");
+    }
+    // @dev Helper function intended to throw on execution because the provided serialNumber and make cause a collision
+    function rightClickSaver() public {
+        market.mintThenListNewHornNFT(
             "Berg",
             "Double",
             "Geyer",
             1, 
             defaultListPrice
         );
-
-        Assert.isFalse(copycatMint, "A corrupt copycat was able to mint a Horn NFT with duplicate hash of make and serialNumber");
     }
-
 
     // @dev Tests internal enum HornStatus functions to ensure that a currentOwner may change their mind about whether to list an instrument for sale
     function testSellerInitiateRefundOrSetStatusToOwnedNotForSale() public {
        // set conditions to identify an NFT that is ListedForSale
        freshMarketplaceAndSellerBuyerInstance();
-       uint hornId = seller.mintAndListFreshHorn();
+       uint hornId = seller.mintAndListFreshTestHorn();
 
        uint returnedStatus = uint(market.sellerInitiateRefundOrSetStatusToOwnedNotForSale(hornId));
        uint expectedStatus = 3;
@@ -401,24 +460,29 @@ contract TestHornMarketplace {
             "Berg",
             "Double",
             "Geyer", 
-            defaultSerialNumber, // serialNumberCounter is inside of Seller contract and not accessible by this function, so a default was made
-            defaultListPrice
+            defaultSerialNumber // serialNumberCounter is inside of Seller contract and not accessible by this function, so a default was made
         );
 
-        bool revertedByElseIf = market.sellerInitiateRefundOrSetStatusToOwnedNotForSale(hornId);
+        bool revertedByElseIf;
+        (revertedByElseIf, ) = address(this).call(abi.encodePacked(this.throwRefund.selector));
 
         Assert.isFalse(revertedByElseIf, "Function call error; it should have reverted because Horn is already set to OwnedNotForSale");
+    }
+    // @dev Helper function intended to throw on execution because Horn is already ListedForSale
+    function throwRefund() public {
+        market.sellerInitiateRefundOrSetStatusToOwnedNotForSale(1);
     }
 
     // @notice This test MUST be updated when/if refund logic is implemented in the marketplace and escrow contracts
     function testSellerInitiateRefundOrSetStatusToOwnedNotForSaleFromPaidFor() public {
         // set conditions to identify an NFT that is PaidFor
         freshMarketplaceAndSellerBuyerInstance();
-        uint hornId = seller.mintAndListFreshHorn();
+        uint hornId = seller.mintAndListFreshTestHorn();
 
         buyer.prepareForShipped(hornId); // {value:}
 
-        bool tooLateTakeTheMoney = market.sellerInitiateRefundOrSetStatusToOwnedNotForSale(hornId);
+        bool tooLateTakeTheMoney;
+        (tooLateTakeTheMoney, ) = address(this).call(abi.encodePacked(this.throwRefund.selector));
 
         Assert.isFalse(tooLateTakeTheMoney, "Seller broke the rules and manipulated HornStatus even after Horn NFT was purchased and paid for by a buyer. That should only be possible after refunds are enabled");
     }
@@ -426,12 +490,13 @@ contract TestHornMarketplace {
     function testSellerInitiateRefundOrSetStatusToOwnedNotForSaleFromShipped() public {
         // set conditions to identify an NFT that is Shipped
         freshMarketplaceAndSellerBuyerInstance();
-        uint hornId = seller.mintAndListFreshHorn();
+        uint hornId = seller.mintAndListFreshTestHorn();
 
         buyer.prepareForShipped(hornId); // {value:}
         seller.prepareForTransfer(hornId);
 
-        bool youAlreadyShippedItYouScammer = market.sellerInitiateRefundOrSetStatusToOwnedNotForSale(hornId);
+        bool youAlreadyShippedItYouScammer;
+        (youAlreadyShippedItYouScammer, ) = address(this).call(abi.encodePacked(this.throwRefund.selector));
 
         Assert.isFalse(youAlreadyShippedItYouScammer, "Evil scammer managed to set Horn NFT to OwnedNotForSale even after shipping the instrument");
     }
@@ -443,19 +508,18 @@ contract TestHornMarketplace {
     function testGetCurrentHornsForSale() public {
         // set conditions to have three NFTs for sale and one not for sale
         freshMarketplaceAndSellerBuyerInstance();
-        seller.mintAndListFreshHorn(); // Id should == 1
-        seller.mintAndListFreshHorn(); // Id should == 2
+        seller.mintAndListFreshTestHorn(); // Id should == 1
+        seller.mintAndListFreshTestHorn(); // Id should == 2
         market.mintButDontListNewHornNFT( // Id should == 3
             "Berg",
             "Double",
             "Geyer", 
-            defaultSerialNumber,
-            defaultListPrice
+            defaultSerialNumber
         );
-        seller.mintAndListFreshHorn(); // Id should == 4
+        seller.mintAndListFreshTestHorn(); // Id should == 4
         
         uint[] memory returnedIds = market.getCurrentHornsForSale();
-        uint[] memory expectedIds = [1, 2, 4];
+        uint[] memory expectedIds;
 
         Assert.equal(returnedIds, expectedIds, "hornsForSale[] uint[] array does not return expected hornIds of the lovely mints being tested");
     }
@@ -463,23 +527,22 @@ contract TestHornMarketplace {
     function testGetCurrentHornsForSaleAfterDeletionViaPurchaseHornByHornId() public {
         // set conditions to have three NFTs for sale and one not for sale, then purchases 2 and 4, removing them from hornsForSale[] array
         freshMarketplaceAndSellerBuyerInstance();
-        seller.mintAndListFreshHorn(); // Id should == 1
-        uint firstTestHornId = seller.mintAndListFreshHorn(); // Id should == 2
+        seller.mintAndListFreshTestHorn(); // Id should == 1
+        uint firstTestHornId = seller.mintAndListFreshTestHorn(); // Id should == 2
         market.mintButDontListNewHornNFT( // Id should == 3
             "Berg",
             "Double",
             "Geyer", 
-            defaultSerialNumber,
-            defaultListPrice
+            defaultSerialNumber
         );
         // @dev Purchases the listed firstTestHornId and thereby 'deletes' it from the hornsForSale[] uint[] array by resetting its value to 0
         buyer.prepareForShipped(firstTestHornId); // {value: listPrice}
-        uint secondTestHornId = seller.mintAndListFreshHorn(); // Id should == 4
+        uint secondTestHornId = seller.mintAndListFreshTestHorn(); // Id should == 4
         buyer.prepareForShipped(secondTestHornId); // {value: listPrice}
         // @dev Purchases the listed secondTestHornId and thereby 'deletes' it from the hornsForSale[] uint[] array by resetting its value to 0
         
-        uint[] memory returnedIds = market.getCurrentHornsForSale();
-        uint[] memory expectedIds = [1, 0, 0]; // originally [1, 2, 4] but 2 and 4 get zeroed out by purchases
+        uint[] memory returnedIds = uint8[3](market.getCurrentHornsForSale());
+        uint[] memory expectedIds; // originally [1, 2, 4] but 2 and 4 get zeroed out by purchases
 
         Assert.equal(returnedIds, expectedIds, "hornsForSale[] uint[] array does not return expected hornId values after minting/listing/purchasing a selection of juicy NFTs");
     }
@@ -488,8 +551,8 @@ contract TestHornMarketplace {
     // @notice This function is used as a helper at different stages of the transaction to track intended behavior
     function testGetListPriceByHornId(uint __hornId) public returns (bool) {
         require(market.getHornById(__hornId).listPrice > 0, "Horn NFT listPrice appears to be 0, check mint execution");
-        uint32 expectedPrice = market.getHornById(__hornId).listPrice;
-        uint32 returnedPrice = market.getListPriceByHornId(__hornId);
+        uint expectedPrice = market.getHornById(__hornId).listPrice;
+        uint returnedPrice = market.getListPriceByHornId(__hornId);
 
         require(expectedPrice == returnedPrice, "Expected listPrice attribute of horn NFT struct does not match the one given by marketplace getter function");
         return true;
@@ -518,7 +581,7 @@ contract TestHornMarketplace {
     // @dev Test the current balance of deposits for given address in escrow contract against market getter function
     function testGetEscrowDepositValue(address payee) public {
         uint returnedDepositValue = market.getEscrowDepositValue(payee);
-        uint correctDepositValue = market.escrow.depositsOf(payee);
+        uint correctDepositValue = market.getEscrowDepositValue(payee);
 
         Assert.equal(returnedDepositValue, correctDepositValue, "Value returned by getEscrowDepositValue does not match escrow depositsOf method");
     }
@@ -526,9 +589,14 @@ contract TestHornMarketplace {
     // @dev Test the behavior of marketplace contract on receipt of only ETH without data
     // @dev Should revert on receipt of ETH without msg.data via fallback() function
     function testIncomingEther() public payable {
-        bool dryEthSend = market.call{ value: 10000000000000000 }();
+        bool dryEthSend;
+        (dryEthSend, ) = address(this).call(abi.encodePacked(this.sendEtherTest.selector));
 
         Assert.isFalse(dryEthSend, "Warning: a suspiciously generous soul donated funds to the marketplace contract without msg.data");
+    }
+    // @dev Helper function intended to throw on execution as dry Ether is rejected by the marketplace contract
+    function sendEtherTest() public payable {
+        address(market).call{ value: 10000000000000000 }();
     }
 
     /*
@@ -570,6 +638,20 @@ contract Seller {
             "Geyer", 
             serialNumberCounter,
             defaultListPrice
+        );
+
+        return currentHornId;
+    }
+
+    // @dev Mints but does not list a fresh Horn NFT from the seller contract for testing purposes
+    function mintButDontListFreshTestHorn() public returns (uint) {
+        serialNumberCounter++;
+
+        uint currentHornId = market.mintButDontListNewHornNFT(
+            "Berg",
+            "Double",
+            "Geyer", 
+            serialNumberCounter
         );
 
         return currentHornId;
