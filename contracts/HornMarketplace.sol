@@ -367,7 +367,8 @@ contract HornMarketplace is Ownable, /*IERC721Receiver, */ERC721Enumerable {
     }
 
     function getBalanceOf(address _owner) public view returns (uint) {
-        balanceOf(_owner);
+        uint hornBalance = balanceOf(_owner);
+        return hornBalance;
     }
 
     function getApprovedToSpend(uint _tokenId) public view returns (address) {
@@ -376,7 +377,8 @@ contract HornMarketplace is Ownable, /*IERC721Receiver, */ERC721Enumerable {
     }
 
     function getEscrowOwner() public view returns (address) {
-        escrow.owner();
+        address escrowOwner = escrow.owner();
+        return escrowOwner;
     }
 
     fallback() external payable {
