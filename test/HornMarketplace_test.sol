@@ -281,17 +281,6 @@ contract HornMarketplace_test is HornMarketplace {
 }
 
 
-// contract Buyer is HornMarketplace {
-
-//     constructor(address __mkt) public {
-
-//     }
-
-// }
-
-
-
-
     // mintdontlist, getstatus, onlysellervialist, forsale, sellerinitiaterefund
 
     // testlistingexisting( on minted), getstatus, getcurrenthornsforsale, sellerinitiaterefund, getlistprice, paidenough, paidfor
