@@ -9,8 +9,8 @@
 
 pragma solidity ^0.8.0;
 
-import "../utils/Ownable.sol";
-import "../utils/Address.sol";
+import "../node_modules/@openzeppelin/contracts/access/Ownable.sol";
+import "../node_modules/@openzeppelin/contracts/utils/Address.sol";
 
 /**
  * @title Escrow

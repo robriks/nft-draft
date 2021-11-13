@@ -6,10 +6,12 @@ pragma solidity 0.8.0;
   * @author Markus Osterlund aka hornosexual.eth, 2nd Horn of National Symphony Orchestra and hopeful Ethereum Engineer @Consensys Academy Bootcamp
  */
 
-import "../utils/Counters.sol";
-import "../utils/Ownable.sol";
-import "../utils/ERC721.sol";
+
 import "./Escrow.sol";
+
+import "../node_modules/@openzeppelin/contracts/utils/Counters.sol";
+import "../node_modules/@openzeppelin/contracts/access/Ownable.sol";
+import "../node_modules/@openzeppelin/contracts/token/ERC721/ERC721.sol";
 
 /*
    Interfaces

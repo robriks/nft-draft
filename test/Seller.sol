@@ -3,6 +3,7 @@ pragma solidity 0.8.0;
 
 interface hornMarketplace {
         function mintThenListNewHornNFT(string calldata _make, string calldata _model, string calldata _style, uint _serialNumber, uint _listPrice) external returns (uint);
+        function mintButDontListNewHornNFT(string calldata _make, string calldata _model, string calldata _style, uint _serialNumber) external returns (uint);
     }
 
 contract Seller {
@@ -20,13 +21,6 @@ contract Seller {
 
     function mintThenListTestHornNFT(address _mkt) public returns (uint) {
         _market = hornMarketplace(_mkt);
-        // (bool success, bytes memory data) = _market.call(abi.encodeWithSignature("mintThenListNewHornNFT(string,string,string,uint,uint)", 
-        //   "Berg", 
-        //   "Double", 
-        //   "Geyer", 
-        //   serialNumberCounter, 
-        //   _defaultListPrice)
-        //   );
         _market.mintThenListNewHornNFT(
             "Berg", 
             "Double", 
@@ -35,6 +29,19 @@ contract Seller {
             _defaultListPrice
             );
 
+        uint currentHornId = serialNumberCounter;
+        serialNumberCounter++;
+        return currentHornId;
+    }
+
+    function mintDontListTestHornNFT(address _mkt) public returns (uint) {
+        _market = hornMarketplace(_mkt);
+        _market.mintButDontListNewHornNFT(
+            "Berg",
+            "Double",
+            "Geyer", 
+            serialNumberCounter
+        );
         uint currentHornId = serialNumberCounter;
         serialNumberCounter++;
         return currentHornId;
