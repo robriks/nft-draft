@@ -6,18 +6,16 @@ pragma solidity 0.8.0;
   * @author Markus Osterlund aka hornosexual.eth, 2nd Horn of National Symphony Orchestra and hopeful Ethereum Engineer @Consensys Academy Bootcamp
  */
 
-import "@openzeppelin/contracts/utils/Counters.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
-import "@openzeppelin/contracts/utils/escrow/Escrow.sol";
-import "@openzeppelin/contracts/token/ERC721/ERC721.sol";
-import "@openzeppelin/contracts/token/ERC721/extensions/ERC721Enumerable.sol";
-
+import "../utils/Counters.sol";
+import "../utils/Ownable.sol";
+import "../utils/ERC721.sol";
+import "./Escrow.sol";
 
 /*
    Interfaces
 */
 
-contract HornMarketplace is Ownable, /*IERC721Receiver, */ERC721Enumerable {
+contract HornMarketplace is Ownable, ERC721 {
     using Counters for Counters.Counter;
     Counters.Counter /*private*/ public _hornId; // OpenZeppelin library initializes this to 0 by default
     /*
@@ -64,7 +62,7 @@ contract HornMarketplace is Ownable, /*IERC721Receiver, */ERC721Enumerable {
     // @notice horns mapping keeps track of all horn NFT owners & histories via _hornId (s/o to OpenZep Counter.counter library)
     mapping (uint => Horn) public horns;
     // @dev Add hash of horn NFT make and serialNumber using Counter.counter to compare all existing hashes to new mints to prevent duplicate NFTs of the same instrument
-    mapping (uint => bytes32) makeAndSerialHashes; // bytes32? bytes memorY?
+    mapping (uint => bytes32) makeAndSerialHashes;
     // @dev currentOwners and buyers mappings used for function access control
     // @dev Add address to buyers when horn is paid for via escrow, address to currentOwners when sale and exchange is complete
     mapping (uint => address) currentOwners;
@@ -82,22 +80,15 @@ contract HornMarketplace is Ownable, /*IERC721Receiver, */ERC721Enumerable {
     event WithdrawnFromEscrow(address indexed payee, uint indexed amountInWei);
     event SellerPaid(uint indexed hornId, address indexed payer, address indexed payee);
 
-    /* 
-        Modifiers for function access control!
-    */
-    // @dev Maintain an owner address in case of emergency
-    // modifier onlyOwner() {
-    //     require(msg.sender == owner);
-    //     _;
-    // }
 
     // @dev Restrict duplicate listings and allow only users who are minting their instrument as an NFT for the first time by checking hashes of concatenated make and serial number
-    modifier nonDuplicateMint(string calldata _make, uint _serialNumber) {
+    modifier nonDuplicateMint(string calldata _make, uint _serialNumber) { //THE MAKEANDSERIALHASHES MAPPING CAN ACTUALLY BE TURNED INTO BYTES ARRAY
         //Hash concatenated _make and _serialNumber given by user
-        bytes32 hashOfMakeAndSerial = keccak256(abi.encodePacked(_make, _serialNumber)); // bytes32? bytes memory?
+        bytes32 hashOfMakeAndSerial = keccak256(abi.encodePacked(_make, _serialNumber));
+        uint numberOfLoops = (_hornId.current()) + 1;
         //Loop through makeAndSerialHashes[] mapping in search for a matching hash, in which case given user input is a duplicate mint
-        for (uint i = 0; i < _hornId.current(); i++) {
-           require(makeAndSerialHashes[i] != hashOfMakeAndSerial);
+        for (uint i = 0; i < numberOfLoops; i++) {
+           require(makeAndSerialHashes[i] != hashOfMakeAndSerial, "This Horn NFT has already been minted");
         }
         _;
     }
@@ -149,7 +140,7 @@ contract HornMarketplace is Ownable, /*IERC721Receiver, */ERC721Enumerable {
       uint _serialNumber, 
       uint _desiredPrice) 
       external 
-      /* nonDuplicateMint(uint(_hornId.current())++, _make, _serialNumber) */ // double check how the Counter.counter works with _hornId in a modifier _; setting
+      /*nonDuplicateMint(_make, _serialNumber)*/
       returns (uint) {
         // @dev listPrice attribute cannot be set to 0
         require(_desiredPrice > 0, "Your Horn is valuable and cannot be sold for free!");
@@ -157,6 +148,7 @@ contract HornMarketplace is Ownable, /*IERC721Receiver, */ERC721Enumerable {
         _hornId.increment();
         uint hornId = _hornId.current();
         _mint(msg.sender, hornId);
+        
         // _setTokenURI(hornId, "https://netlify.com/largemediafiles/lfs")
           
         // @dev Store all horn metadata on-chain EXCEPT images which are stored externally via URI
@@ -173,6 +165,8 @@ contract HornMarketplace is Ownable, /*IERC721Receiver, */ERC721Enumerable {
         // @dev update mappings and arrays to reflect new listing
         currentOwners[hornId] = msg.sender;
         hornsForSale.push(hornId);
+        bytes32 hashOfMakeAndSerial = keccak256(abi.encodePacked(_make, _serialNumber));
+        makeAndSerialHashes[hornId] = hashOfMakeAndSerial;
 
         emit HornListedForSale(hornId, msg.sender, _make);
 
@@ -207,6 +201,8 @@ contract HornMarketplace is Ownable, /*IERC721Receiver, */ERC721Enumerable {
 
           // @dev Update mappings to reflect new mint
           currentOwners[hornId] = msg.sender;
+          bytes32 hashOfMakeAndSerial = keccak256(abi.encodePacked(_make, _serialNumber));
+          makeAndSerialHashes[hornId] = hashOfMakeAndSerial;
 
           emit NewHornNFTMinted(hornId, msg.sender, _make);
 
@@ -336,7 +332,7 @@ contract HornMarketplace is Ownable, /*IERC721Receiver, */ERC721Enumerable {
     /*
         Helper functions that provide getter functionality
     */
-    // @dev Returns an array of hornId uints that are read by the front end to display Horns listed for sale
+    //@dev Returns an array of hornId uints that are read by the front end to display Horns listed for sale
     function getHornById(uint _index) public view returns (Horn memory) { //THIS STRUCT NEEDS TO BE UNPACKED TO PROPERLY COMPILE/TEST BETWEEN CONTRACTS
         return horns[_index];
     }
