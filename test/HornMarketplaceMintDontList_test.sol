@@ -34,7 +34,7 @@
 //     function testMintButDontListNewHornNFT() public {
 //         // Mints but does not list a new Horn NFT from this contract and returns currentHornId
 //         uint returnedHornId = seller.mintDontListTestHornNFT(address(market));
-//         uint expectedHornId = 1; // Expected currentHornId is 2 as this is the second test Horn NFT minted
+//         uint expectedHornId = 2; // Expected currentHornId is 2 as this is the second test Horn NFT minted
         
 //         Assert.equal(returnedHornId, expectedHornId, "returnedHornId given by mintAndListFreshTestHorn's Counter.Counter does not match the expectedHornId of 1 for a fresh contract instance's first mint");
 //     }

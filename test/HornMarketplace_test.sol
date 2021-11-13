@@ -278,10 +278,59 @@ contract HornMarketplace_test is HornMarketplace {
         Assert.equal(returnedCurrentOwner, expectedCurrentOwner, "Horn NFT was minted to a different address than the seller address, check execution of mint and the currentOwner attribute");
     }
 
+     // @dev Test current owner getter function by getting returned address of given hornId
+    function testGetCurrentOwnerMappingAgainstStructAttributeByHornIdAgain() public returns (bool) {
+        address payable mappingOwner = market.getCurrentOwnerByMapping(2);
+        address payable structOwner = market.getCurrentOwnerByStructAttribute(2);
+        
+        Assert.equal(mappingOwner, structOwner, "currentOwner of horn NFT via mapping does not match that of currentOwner via struct attribute");
+        return true;
+    }
+
+    function testGetStatusOfHornByHornIdAgain() public returns (bool) {
+        uint testHornId = 2;
+        uint expectedStatus = 3; // 0 = ListedForSale, 1 = PaidFor, 2 = Shipped, 3 = OwnedNotForSale
+        uint returnedStatus = uint(market.getStatusOfHornByHornId(testHornId));
+
+        Assert.equal(returnedStatus, expectedStatus, "HornStatus enum uint returned by marketplace contract does not match the expected one given");
+        return true;
+    }
+
+    // @dev Attempts to call listExistingHornNFT() from non-seller address who isn't currentOwner of the horn NFT
+    function testOnlySellerViaList() public {
+        uint testHornId = 2;
+        // @dev Impersonator tries to sell someone else's NFT
+        // @notice Following function is called by an account that isn't the same one who minted
+
+        try market.listExistingHornNFT(testHornId, defaultListPrice) returns (uint h) {
+            Assert.ok(false, "A rogue account was able to sell a horn NFT that it didn't own");
+        } catch Error(string memory reason) {
+            Assert.equal(reason, "This function may only be called by the horn NFT's owner", "Failed with unexpected reason");
+        } catch (bytes memory /* lowLevelData */) {
+            Assert.ok(false, "Unexpected failure");
+        }
+    }
+
+    // @dev Attempts to call purchaseHornById on a horn that is not currently listed for sale
+    function testForSale() public {
+        uint testHornId = 2;
+        
+        // Function intended to throw on execution via Horn not being ListedForSale
+        try market.purchaseHornByHornId(testHornId, "a") {
+            Assert.ok(false, "A sneaky user found a way to buy without being given consent");
+        } catch Error(string memory reason) {
+            Assert.equal(reason, "Horn is not currently listed for sale", "Failed with unexpected reason");
+        } catch (bytes memory /*lowLevelData*/) {
+            Assert.ok(false, "Unexpected failure");
+        }
+    }
+
+
+
+
+
 }
 
-
-    // mintdontlist, getstatus, onlysellervialist, forsale, sellerinitiaterefund
 
     // testlistingexisting( on minted), getstatus, getcurrenthornsforsale, sellerinitiaterefund, getlistprice, paidenough, paidfor
 
