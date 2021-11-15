@@ -20,7 +20,9 @@
   },
   "homepage": "https://github.com/robriks/blockchain-developer-bootcamp-final-project#readme",
   "dependencies": {
-    "@openzeppelin/contracts": "^4.3.3"
+    "@openzeppelin/contracts": "^4.3.3",
+    "ganache-cli": "^6.12.2",
+    "solc": "^0.8.10"
   },
   "devDependencies": {
     "@remix-project/remix-tests": "^0.2.8"

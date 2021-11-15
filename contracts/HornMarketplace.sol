@@ -84,16 +84,16 @@ contract HornMarketplace is Ownable, ERC721 {
 
 
     // @dev Restrict duplicate listings and allow only users who are minting their instrument as an NFT for the first time by checking hashes of concatenated make and serial number
-    modifier nonDuplicateMint(string calldata _make, uint _serialNumber) { //THE MAKEANDSERIALHASHES MAPPING CAN ACTUALLY BE TURNED INTO BYTES ARRAY
-        //Hash concatenated _make and _serialNumber given by user
-        bytes32 hashOfMakeAndSerial = keccak256(abi.encodePacked(_make, _serialNumber));
-        uint numberOfLoops = (_hornId.current()) + 1;
-        //Loop through makeAndSerialHashes[] mapping in search for a matching hash, in which case given user input is a duplicate mint
-        for (uint i = 0; i < numberOfLoops; i++) {
-           require(makeAndSerialHashes[i] != hashOfMakeAndSerial, "This Horn NFT has already been minted");
-        }
-        _;
-    }
+    // modifier nonDuplicateMint(string calldata _make, uint _serialNumber) { //THE MAKEANDSERIALHASHES MAPPING CAN ACTUALLY BE TURNED INTO BYTES ARRAY
+    //     //Hash concatenated _make and _serialNumber given by user
+    //     bytes32 hashOfMakeAndSerial = keccak256(abi.encodePacked(_make, _serialNumber));
+    //     uint numberOfLoops = (_hornId.current()) + 1;
+    //     //Loop through makeAndSerialHashes[] mapping in search for a matching hash, in which case given user input is a duplicate mint
+    //     for (uint i = 0; i < numberOfLoops; i++) {
+    //        require(makeAndSerialHashes[i] != hashOfMakeAndSerial, "This Horn NFT has already been minted");
+    //     }
+    //     _;
+    // }
     // @dev Restrict to only buyer who paid and was added to buyers[] mapping
     modifier onlyBuyerWhoPaid(uint hornId) {
         require(buyers[hornId] == msg.sender, "This function may only be called by a buyer who has already paid");
@@ -106,7 +106,7 @@ contract HornMarketplace is Ownable, ERC721 {
     }
     // @dev Checks that function caller sent exact ETH amount to purchase horn for listed price **later can use if/or clauses to support stablecoin purchases
     modifier paidEnough(uint hornId) {
-        require(msg.value == horns[hornId].listPrice, "Payment amount must exactly match listed price"); // later implement logic that calculates stablecoin price equivalents
+        require(msg.value == horns[hornId].listPrice, "Payment amount must exactly match listed price");
         _;
     }
     // @dev Following modifiers read enum HornStatus of _hornIds and escrow deposits to maintain security and correct order of function calls thru sale process
@@ -151,7 +151,7 @@ contract HornMarketplace is Ownable, ERC721 {
         uint hornId = _hornId.current();
         _mint(msg.sender, hornId);
         
-        // _setTokenURI(hornId, "https://netlify.com/largemediafiles/lfs")
+        // _setTokenURI(hornId, "https://githubpages.io/largemediafiles/lfs")
           
         // @dev Store all horn metadata on-chain EXCEPT images which are stored externally via URI
         horns[hornId] = Horn({
@@ -182,7 +182,7 @@ contract HornMarketplace is Ownable, ERC721 {
       string calldata _style,
       uint _serialNumber) 
       external
-      nonDuplicateMint(_make, _serialNumber) 
+    //   nonDuplicateMint(_make, _serialNumber) 
       returns (uint) {
         // @dev Increment counter _hornId then store publicly accessible hornId using current counter
         _hornId.increment();
@@ -216,7 +216,6 @@ contract HornMarketplace is Ownable, ERC721 {
       public 
       onlySeller(__hornId) 
       returns (uint) {
-        require(_exists(__hornId), "That Horn NFT tokenId doesn't exist");
         require(_desiredPrice > 0, "Your Horn is valuable and cannot be sold for free!");
         require(horns[__hornId].status != HornStatus.ListedForSale, "Your Horn is already listed for sale");
 
@@ -233,7 +232,7 @@ contract HornMarketplace is Ownable, ERC721 {
     }
 
     // @dev Require that given __hornId is forSale and not already purchased
-    function purchaseHornByHornId(uint __hornId, string calldata _shipTo) // maybe use bytes for address, remove spaces and concatenate in frontend input? so it can be hashed and stored privately
+    function purchaseHornByHornId(uint __hornId, string memory _shipTo) // maybe use bytes for address, remove spaces and concatenate in frontend input? so it can be hashed and stored privately
       public 
       payable 
       forSale(__hornId) 
@@ -248,7 +247,8 @@ contract HornMarketplace is Ownable, ERC721 {
         escrow.deposit(currentOwners[__hornId]);
         // @dev Add shipping address of buyer aka msg.sender to mapping for later confirmation
         // @param May be cheaper gas wise to enter bytes instead of string type in front end
-        shippingAddresses[msg.sender] = _shipTo;
+        string memory shipTo = _shipTo;
+        shippingAddresses[msg.sender] = shipTo;
         // @dev Add msg.sender to buyers[] mapping for access control checking during markHornShipped function call and shipping address confirmation: 
         buyers[__hornId] = msg.sender;
         // @dev Set status to PaidFor so next function to be called must be markHornShipped by seller
@@ -310,32 +310,12 @@ contract HornMarketplace is Ownable, ERC721 {
 
         return paymentAmt;
     }
-    
-    // @dev Function that sets status of existing horn NFT to OwnedNotForSale, 
-    // @notice Used in case minter only wants verifiable historical record or owner decides not to sell the instrument after listing or wishes to refund a buyer
-    // @notice Must be set to internal after testing is done, only temporarily set to public for testing purposes
-    function sellerInitiateRefundOrSetStatusToOwnedNotForSale(uint __hornId) public /*internal onlySeller()*/ returns (HornStatus) {
-        if (horns[__hornId].status == HornStatus.ListedForSale) {
-            horns[__hornId].status = HornStatus.OwnedNotForSale;
-        } else if (horns[__hornId].status == HornStatus.PaidFor) {
-            revert("Horn has already been purchased and paid for by a buyer and on-chain refunds are not currently supported"); // change this line once refund logic is implemented
-            //REFUND LOGIC HERE: escrow.refundToBuyer(); functino refundToBuyer() probably has a nested mapping of address => uint => enum == buyer => deposits => state.refundable / state.nonrefundable that gets updated when horn is markShipped
-            // refund logic could probably include this next line within the refund function
-            // horns[__hornId].status = HornStatus.OwnedNotForSale;
-        } else if (horns[__hornId].status == HornStatus.Shipped) {
-            revert("Horn has already been shipped and no longer qualifies for a refund, please complete the exchange and redo the exchange in reverse if you wish to switch back ownership");
-        } else if (horns[__hornId].status == HornStatus.OwnedNotForSale) {
-            revert("Horn is already marked as owned and not for sale");
-        }
-
-        return(HornStatus.OwnedNotForSale);
-    }
 
     /*
         Helper functions that provide getter functionality
     */
-    //@dev Returns an array of hornId uints that are read by the front end to display Horns listed for sale
-    function getHornById(uint _index) public view returns (Horn memory) { //THIS STRUCT NEEDS TO BE UNPACKED TO PROPERLY COMPILE/TEST BETWEEN CONTRACTS
+    // @dev Returns an array of hornId uints that are read by the front end to display Horns listed for sale
+    function getHornById(uint _index) public view returns (Horn memory) {
         return horns[_index];
     }
 
@@ -382,23 +362,4 @@ contract HornMarketplace is Ownable, ERC721 {
     fallback() external payable {
         revert("Please do not send this contract funds without any function call data or call a function that doesn't exist");
     }
-
-    // in future, can add filter functions as well to display only doubles or only Lukas, etc
-    /* in future, can add support for ERC20 stablecoin payments via a price getter helper function that uses chainlink to calculate current Eth amount to match listed price in dollars:
-        something like require(msg.value == hornMarketplace.HORNPRICEGETTERFUNCTIONHERE()) but needs to aid user in submitting tx with correct ETH amount
-    */
-
-
-    /*
-        Administrative Functions
-    */
-    /* 
-    // Allows owner of the marketplace to withdraw fees accumulated by trading
-    function withdrawAccumulatedFees() external onlyOwner {
-        owner.call{value: address(this).balance};
-    }
-    function pause() external onlyOwner {
-        _pause() // how does this work with pausable openzeppelin library?
-    }
-    */
 }
