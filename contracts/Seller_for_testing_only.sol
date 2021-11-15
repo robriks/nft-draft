@@ -66,4 +66,6 @@ contract Seller {
         string memory shipTo = _shipTo;
         _market.markHornShipped(currentHornId, shipTo);
     }
+
+    receive() external payable {}
 }

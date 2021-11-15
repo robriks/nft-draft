@@ -322,10 +322,8 @@ contract TestMarket {
     }
 
     function testHornPurchase() public {
-        bool r;
         uint hornId = 1;
         string memory testAddress = "Ju St. Testing, Purchase Attempt New York, 11111";
-        // (r,) = address(buyer).call{value: 420}(abi.encodeWithSignature("purchase(address, uint256, string)", address(market), hornId, testAddress));
         buyer.purchase(address(market), hornId, testAddress);
         uint returnedStatus = uint(market.getStatusOfHornByHornId(hornId));
 
@@ -382,7 +380,7 @@ contract TestMarket {
         seller.markShipped(address(market), hornId, testAddress);
         // Check that approval for __hornId given to marketplace contract was carried out
         address returnedApprovedAddressForHornId = market.getApprovedToSpend(hornId);
-        address expectedApprovedAddressForHornId = address(market);
+        address expectedApprovedAddressForHornId = address(buyer);
 
         Assert.equal(returnedApprovedAddressForHornId, expectedApprovedAddressForHornId, "Returned approved address for tokenId doesn't match expected address, check execution of Approve()");
     }
@@ -412,7 +410,7 @@ contract TestMarket {
         string memory mistakeShipTo = "21 Million Silk Rd. Darknet, Metaverse 66666";
         try market.markHornShipped(hornId, mistakeShipTo) returns (string memory s) {
             Assert.notEqual(s, "21 Million Silk Rd. Darknet, Metaverse 66666", "Against all odds, a seller somehow managed to ship a horn to the wrong address");
-        } catch Error(string memory reason) {
+        } catch Error(string memory) {
             return (false);
         }
     }
@@ -434,8 +432,12 @@ contract TestMarket {
         Assert.equal(returnedBuyerOfHornId, expectedBuyerOfHornIdShouldBe0, "Address returned by buyers[hornId] was not successfully zeroed out");
     }
 
-    //  getstatus
+function testNotForSaleStatus() public {
+        uint hornId = 1;
+        uint returnedStatus = uint(market.getStatusOfHornByHornId(hornId));
 
+        Assert.equal(returnedStatus, 3, "HornStatus was not successfully updated to OwnedNotForSale");
+    }
     // @dev Test the behavior of marketplace contract on receipt of only ETH without data
     // @dev Should revert on receipt of ETH without msg.data via fallback() function
     function testIncomingEther() public {

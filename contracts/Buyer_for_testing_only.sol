@@ -21,11 +21,9 @@ contract Buyer {
 
     // @param Constructor parameter _mkt passed in by the function that calls this one
     function purchase(address _mkt, uint _currentHornId, string memory _shipTo) public payable {
-        bool r;
         uint currentHornId = _currentHornId;
         string memory shipTo = _shipTo;
         _market = hornMarketPlace(_mkt);
-        // (r,) = address(_market).call{value: msg.value}(abi.encodeWithSignature("purchaseHornByHornId(uint256, string)", currentHornId, shipTo));
         _market.purchaseHornByHornId{value: 420}(currentHornId, shipTo);
     }
 

@@ -120,7 +120,7 @@ contract HornMarketplace is Ownable, ERC721 {
         _;
     }
     modifier shipped(uint __hornId) {
-        require(_isApprovedOrOwner(address(this), __hornId), "This contract must first be approved by current horn owner"); // ensure this contract is approved to spend horn NFT by the seller
+        require(_isApprovedOrOwner(msg.sender, __hornId), "You must first be approved by current horn owner"); // ensure msg.sender is approved to spend horn NFT by the seller
         require(uint(horns[__hornId].status) == 2, "Horn has not been marked as shipped yet"); // requires Shipped status
         _;
     }
@@ -275,7 +275,7 @@ contract HornMarketplace is Ownable, ERC721 {
         // @dev Set status of __hornId to Shipped so next function to be called will finalize exchange
         horns[__hornId].status = HornStatus.Shipped;
         // @dev Approves this contract as spender of horn nft so that it will be safetransferred in next function call 
-        approve(address(this), __hornId);
+        approve(buyer, __hornId);
         
         // @notice Emit event to notify buyer via frontend that horn is on its way
         emit HornShipped(__hornId, shippedTo, buyers[__hornId]);
@@ -304,8 +304,8 @@ contract HornMarketplace is Ownable, ERC721 {
         // @dev Update currentOwners mapping to give ownership to buyer
         currentOwners[__hornId] = msg.sender;
 
-        // @dev Transfer horn NFT from seller(currentOwner) to msg.sender using safeTransferFrom from ERC721 interface (avoids NFTs locked in contracts)
-        transferFrom(address(this), msg.sender, __hornId);
+        // @dev Transfer horn NFT from seller(currentOwner) to msg.sender using TransferFrom from ERC721 interface (avoids NFTs locked in contracts)
+        transferFrom(previousOwner, msg.sender, __hornId);
 
         emit HornDeliveredAndNFTOwnershipTransferred(__hornId, previousOwner, msg.sender);
         emit SellerPaid(__hornId, previousOwner, msg.sender);
@@ -362,7 +362,10 @@ contract HornMarketplace is Ownable, ERC721 {
         return escrowOwner;
     }
 
-    fallback() external payable {
-        revert("Please do not send this contract funds without any function call data or call a function that doesn't exist");
+    receive() external payable {
+        revert("Please do not send this contract funds or call a function that doesn't exist");
+    }
+    fallback() external {
+        revert("Please do not send this contract funds or call a function that doesn't exist");
     }
 }
