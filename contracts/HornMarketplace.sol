@@ -19,12 +19,11 @@ import "../node_modules/@openzeppelin/contracts/token/ERC721/ERC721.sol";
 
 contract HornMarketplace is Ownable, ERC721 {
     using Counters for Counters.Counter;
-    Counters.Counter /*private*/ public _hornId; // OpenZeppelin library initializes this to 0 by default
+    Counters.Counter private _hornId; // OpenZeppelin library initializes this to 0 by default
     /*
-        Instantiate Escrow Contract
+        Declare Escrow Contract
     */
     Escrow escrow;
-    //EscrowContract escrow = EscrowContract(DEVELOPMENT_DEPLOYED_ESCROW_ADDR_HERE); // these two lines necessary?
     //EscrowContract escrow = EscrowContract(RINKEBY_DEPLOYED_ESCROW_ADDR_HERE)
 
     /*
@@ -36,12 +35,12 @@ contract HornMarketplace is Ownable, ERC721 {
     // @param serialNumber denotes serial number
     // @param currentOwner denotes musician who currently owns the instrument
     // @param buyer denotes buyer who purchased
-    struct Horn { // optimize gas on these struct attributes- which order/size?
+    struct Horn {
       string make;
       string model;
       string style;
       uint serialNumber;
-      uint listPrice; // this attribute probably needs to be labeled as 'inWei' and converted from eth at time of listing
+      uint listPrice;
       HornStatus status;
       address payable currentOwner;
     }
@@ -244,7 +243,7 @@ contract HornMarketplace is Ownable, ERC721 {
         * Can these addresses be opaquely stored on front-end instead? zk rollups would alleviate this issue
         */
         // @dev Forward payment to escrow contract for safekeeping
-        escrow.deposit(currentOwners[__hornId]);
+        escrow.deposit{value: msg.value}(currentOwners[__hornId]);
         // @dev Add shipping address of buyer aka msg.sender to mapping for later confirmation
         // @param May be cheaper gas wise to enter bytes instead of string type in front end
         string memory shipTo = _shipTo;
@@ -265,9 +264,10 @@ contract HornMarketplace is Ownable, ERC721 {
         emit DepositedToEscrow(horns[__hornId].currentOwner, msg.value);
     }
 
-    function markHornShipped(uint __hornId, string calldata shippedTo) public 
+    function markHornShipped(uint __hornId, string calldata shippedTo) public
       onlySeller(__hornId) 
-      hornPaidFor(__hornId) {
+      hornPaidFor(__hornId) 
+      returns (string memory) {
         // @dev Set buyer variable to confirm shipping address shipTo against shippingAddresses mapping given by buyer
         address buyer = buyers[__hornId];
         // @notice The addresses must match exactly as they are hashed- an issue considering extremely common user error, data fields must be explicit on front end for proper resolution
@@ -279,6 +279,8 @@ contract HornMarketplace is Ownable, ERC721 {
         
         // @notice Emit event to notify buyer via frontend that horn is on its way
         emit HornShipped(__hornId, shippedTo, buyers[__hornId]);
+
+        return shippedTo;
     }
 
     // This function MUST be called in order to release escrow funds to seller, and transfer NFT ownership
@@ -286,10 +288,11 @@ contract HornMarketplace is Ownable, ERC721 {
       onlyBuyerWhoPaid(__hornId) 
       shipped(__hornId) 
       returns (uint256) {
+        address payable payee = horns[__hornId].currentOwner;
         // @dev Save payment amount in uint variable to be visually returned for improved UX/UI
-        uint paymentAmt = escrow.depositsOf(horns[__hornId].currentOwner);
+        uint paymentAmt = escrow.depositsOf(payee);
         // @dev Release escrowed payment funds to the seller from escrow contract
-        escrow.withdraw(horns[__hornId].currentOwner);
+        escrow.withdraw(payee);
         // @dev Wipe msg.sender from buyers[] and shippingaddresses[] for future txs in case buyer changes address
         buyers[__hornId] = address(0);
         shippingAddresses[msg.sender] = "";
@@ -299,10 +302,10 @@ contract HornMarketplace is Ownable, ERC721 {
         // @dev Set previousOwner variable using currentOwners mapping, before that value is updated to reflect new owner
         address previousOwner = currentOwners[__hornId];
         // @dev Update currentOwners mapping to give ownership to buyer
-        currentOwners[__hornId] == msg.sender;
+        currentOwners[__hornId] = msg.sender;
 
         // @dev Transfer horn NFT from seller(currentOwner) to msg.sender using safeTransferFrom from ERC721 interface (avoids NFTs locked in contracts)
-        safeTransferFrom(previousOwner, msg.sender, __hornId); // if this doesn't work it's because address(this) of this smart contract is the one who was approved in previous function but this function lists the 'from' parameter as the owner. simply change to address(this)
+        transferFrom(address(this), msg.sender, __hornId);
 
         emit HornDeliveredAndNFTOwnershipTransferred(__hornId, previousOwner, msg.sender);
         emit SellerPaid(__hornId, previousOwner, msg.sender);

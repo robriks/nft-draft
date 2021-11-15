@@ -6,6 +6,7 @@ interface hornMarketplace {
         function mintThenListNewHornNFT(string calldata _make, string calldata _model, string calldata _style, uint _serialNumber, uint _listPrice) external returns (uint);
         function mintButDontListNewHornNFT(string calldata _make, string calldata _model, string calldata _style, uint _serialNumber) external returns (uint);
         function listExistingHornNFT(uint, uint) external returns (uint);
+        function markHornShipped(uint, string calldata) external;
     }
 
 contract Seller {
@@ -57,5 +58,12 @@ contract Seller {
             _defaultListPrice
         );
         return currentHornId;
+    }
+
+    function markShipped(address _mkt, uint _Id, string memory _shipTo) public {
+        _market = hornMarketplace(_mkt);
+        uint currentHornId = _Id;
+        string memory shipTo = _shipTo;
+        _market.markHornShipped(currentHornId, shipTo);
     }
 }

@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.0;
 
-// import "remix_tests.sol"; // injected by remix-tests CLI
 import "truffle/Assert.sol";
 import "truffle/DeployedAddresses.sol";
 import "../contracts/HornMarketplace.sol";
 import "../contracts/Helpers.sol";
-// import "../contracts/Seller_for_testing_only.sol";
+import "../contracts/Buyer_for_testing_only.sol";
 
 interface aSeller {
     function mintThenListTestHornNFT(address) external returns (uint);
     function mintDontListTestHornNFT(address) external returns (uint);
     function listExisting(address, uint) external returns (uint);
+    function markShipped(address, uint, string calldata) external;
 }
 
 interface aHelpers {
@@ -24,18 +24,17 @@ contract TestMarket {
     HornMarketplace public market = HornMarketplace(DeployedAddresses.HornMarketplace());
     aHelpers helpers;
     aSeller seller;
-    //Buyer public buyer = new Buyer;
+    Buyer buyer;
 
+    uint public initialBalance = 10 ether;
     uint serialNumberCounter;
     uint defaultListPrice;
 
     // @param This serialNumberCounter gives a new serialNumber to mint fresh Horn NFTs for every subsequent test without any hash collisions from make and serialNumber via the nonDuplicateMint modifier
     function beforeAll() public {
-        //market = HornMarketplace(DeployedAddresses.HornMarketplace());
         seller = aSeller(DeployedAddresses.Seller());
         helpers = aHelpers(DeployedAddresses.Helpers());
-        // seller = new Seller();
-
+        buyer = (new Buyer){value: 1000000}();
         serialNumberCounter = 0;
         defaultListPrice = 420;
     }
@@ -292,9 +291,6 @@ contract TestMarket {
     // @dev Make both horns listedForSale and return the hornsForSale array
     // @param Uint array hornsForSale[] takes the horn struct at index 0
     function testGetCurrentHornsForSaleExisting() public {
-        // uint currentHornId = 1;
-        // seller.listExisting(address(market), currentHornId);
-
         uint[] memory hornsForSale = market.getCurrentHornsForSale();
         uint[] memory expectedIds = new uint[](2);
         expectedIds[0] = 1;
@@ -306,7 +302,6 @@ contract TestMarket {
     // @dev Attempts to call purchaseHornById without having paid enough ETH in msg.value
     function testPaidEnough() public payable {
         uint hornId = 1;
-        uint tooMuch = defaultListPrice + 42069;
         bool r;
 
         // Function intended to throw on execution via msg.value being more than the listPrice
@@ -330,12 +325,20 @@ contract TestMarket {
         bool r;
         uint hornId = 1;
         string memory testAddress = "Ju St. Testing, Purchase Attempt New York, 11111";
-        // This line uses this contract to buy, to test if contracts can purchase as well as EOA users
-        (r,) = address(market).call{value: 420}(abi.encodeWithSignature("purchaseHornByHornId(uint256, string)", hornId, testAddress));
-        Assert.isTrue(r, "Unexpected error");
+        // (r,) = address(buyer).call{value: 420}(abi.encodeWithSignature("purchase(address, uint256, string)", address(market), hornId, testAddress));
+        buyer.purchase(address(market), hornId, testAddress);
+        uint returnedStatus = uint(market.getStatusOfHornByHornId(hornId));
+
+        Assert.equal(returnedStatus, 1, "HornStatus was not successfully updated to PaidFor, check execution of purchaseHornByHornId()");
     }
 
-    function shouldHaveDeleted() public {
+    function testEscrowOwner() public {
+        address returnedOwner = market.getEscrowOwner();
+        
+        Assert.equal(returnedOwner, address(market), "Escrow instantiation issue");
+    }
+
+    function testshouldHaveDeleted() public {
         uint shouldHaveBeenDeleted = market.hornsForSale(0);
         // Check that hornId was deleted from hornsForSale[] uint[] array
         Assert.isZero(shouldHaveBeenDeleted, "Value returned by hornsForSale[] uint[] array was not 0, meaning it was not properly deleted upon execution of purchase");
@@ -350,7 +353,7 @@ contract TestMarket {
 
     function testReturnedShippingAddress() public {
         string memory testAddress = "Ju St. Testing, Purchase Attempt New York, 11111";
-        string memory returnedShippingAddress = market.shippingAddresses(address(this));
+        string memory returnedShippingAddress = market.shippingAddresses(address(buyer));
 
          // Check that shippingAddresses mapping was updated with 2nd parameter
         Assert.equal(returnedShippingAddress, testAddress, "Shipping address returned by shippingAddresses[] mapping does not match the test address provided to purchaseHornByHornId function");
@@ -359,15 +362,9 @@ contract TestMarket {
     function testAddedToBuyersMapping() public {
         uint hornId = 1;
         address returnedBuyerAddress = market.buyers(hornId);
+        address expectedBuyerAddress =  address(buyer);
         // Check that buyers mapping was updated to msg.sender, in this case address(this)
-        Assert.equal(returnedBuyerAddress, address(this), "Address returned by market buyers[] mapping does not match the one that purchased the instrument, in this case this contract");
-    }
-
-    function testUpdatedToPaidFor() public {
-        uint hornId = 1;
-        uint returnedStatus = uint(market.getStatusOfHornByHornId(hornId));
-
-        Assert.equal(returnedStatus, 1, "HornStatus was not successfully updated to PaidFor, check execution of purchaseHornByHornId()");
+        Assert.equal(returnedBuyerAddress, expectedBuyerAddress, "Address returned by market buyers[] mapping does not match the one that purchased the instrument, in this case this contract");
     }
 
     // @dev Attempts to call markHornDeliveredAndOwnershipTransferred when horn is not yet marked shipped by seller
@@ -381,9 +378,11 @@ contract TestMarket {
     // @dev Ensure only Sellers can mark horn shipped
     function testMarkHornShipped() public {
         uint hornId = 1;
+        string memory testAddress = "Ju St. Testing, Purchase Attempt New York, 11111";
+        seller.markShipped(address(market), hornId, testAddress);
         // Check that approval for __hornId given to marketplace contract was carried out
         address returnedApprovedAddressForHornId = market.getApprovedToSpend(hornId);
-        address expectedApprovedAddressForHornId = market.buyers(hornId);
+        address expectedApprovedAddressForHornId = address(market);
 
         Assert.equal(returnedApprovedAddressForHornId, expectedApprovedAddressForHornId, "Returned approved address for tokenId doesn't match expected address, check execution of Approve()");
     }
@@ -398,15 +397,50 @@ contract TestMarket {
     // @notice Modifier tests to ensure that access control and other modifier functions work properly
     // @dev Attempts to call transfer ownership function from non-buyer address without paying
     // @dev Ensures only buyer can markHornDeliveredAndOwnershipTransferred
-    // function testOnlyBuyerWhoPaid() public {
-    //     uint hornId = 1;
-        // bool r;
-        // (r,) = address(market).call(abi.encodeWithSignature("markHornDeliveredAndOwnershipTransferred(uint256)", hornId));
-        // Assert.isFalse(r, "An account that hasn't paid or been marked as buyer pilfered the NFT!");
+    function testOnlyBuyerWhoPaid() public {
+        uint hornId = 1;
+        bool r;
+        (r,) = address(market).call(abi.encodeWithSignature("markHornDeliveredAndOwnershipTransferred(uint256)", hornId));
+        Assert.isFalse(r, "An account that hasn't paid or been marked as buyer pilfered the NFT!");
 
-    // }
+    }
 
-    // onlybuyerwhopaid
+    // @dev Attempts to mark shipped with a wrong address
+    function testMarkHornShippedWithWrongAddress() public returns (bool) {
+        uint hornId = 1;
+        // Feed in a wrong address to ensure require() line prevents seller from shipping to the wrong place
+        string memory mistakeShipTo = "21 Million Silk Rd. Darknet, Metaverse 66666";
+        try market.markHornShipped(hornId, mistakeShipTo) returns (string memory s) {
+            Assert.notEqual(s, "21 Million Silk Rd. Darknet, Metaverse 66666", "Against all odds, a seller somehow managed to ship a horn to the wrong address");
+        } catch Error(string memory reason) {
+            return (false);
+        }
+    }
 
-    // testmarkhorndelivered, getstatus, incomingETH
+    // @dev Ensure markHornDeliveredAndOwnershipTransferred is working as intended
+    function testMarkHornDeliveredAndOwnershipTransferred() public {
+        uint hornId = 1;
+        buyer.markDelivered(address(market), hornId);
+        address currentOwnerViaMapping = market.getCurrentOwnerByMapping(hornId);
+        // Check that currentOwner was transferred to buyer
+        Assert.equal(currentOwnerViaMapping, address(buyer), "CurrentOwner of Horn NFT as returned by storage mapping does not match expected address");
+    }
+
+    function testBuyerDeleted() public {
+        uint hornId = 1;
+        address returnedBuyerOfHornId = market.buyers(hornId);
+        address expectedBuyerOfHornIdShouldBe0 = address(0);
+        // Check that buyers[hornId] was set to address(0)
+        Assert.equal(returnedBuyerOfHornId, expectedBuyerOfHornIdShouldBe0, "Address returned by buyers[hornId] was not successfully zeroed out");
+    }
+
+    //  getstatus
+
+    // @dev Test the behavior of marketplace contract on receipt of only ETH without data
+    // @dev Should revert on receipt of ETH without msg.data via fallback() function
+    function testIncomingEther() public {
+        bool r;
+        (r,) = address(market).call{value: 100}("");
+        Assert.isFalse(r, "Warning: a suspiciously generous soul donated funds to the marketplace contract without msg.data, check fallback");
+    }
 }
